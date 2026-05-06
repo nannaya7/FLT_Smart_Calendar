@@ -347,7 +347,7 @@ class _CalendarPageState extends State<CalendarPage> {
               '${day.day}',
               style: TextStyle(
                 color: dayColor,
-                fontSize: 15,
+                fontSize: 22.5,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -357,7 +357,7 @@ class _CalendarPageState extends State<CalendarPage> {
               subText,
               style: TextStyle(
                 color: subColor,
-                fontSize: 8,
+                fontSize: 12,
                 fontWeight: (info.isSpecial || info.holiday != null)
                     ? FontWeight.w600
                     : FontWeight.normal,
