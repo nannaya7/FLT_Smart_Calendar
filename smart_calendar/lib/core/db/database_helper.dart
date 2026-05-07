@@ -5,7 +5,7 @@ import '../../shared/models/holiday.dart';
 
 class DatabaseHelper {
   static const _dbName = 'smart_calendar.db';
-  static const _dbVersion = 2;
+  static const _dbVersion = 4;
   static const tableSchedules = 'schedules';
   static const tableHolidays = 'holidays';
 
@@ -40,7 +40,10 @@ class DatabaseHelper {
         time                 TEXT,
         is_lunar             INTEGER NOT NULL DEFAULT 0,
         alarm_minutes_before INTEGER,
-        category_color       INTEGER NOT NULL DEFAULT ${0xFF2196F3}
+        category_color       INTEGER NOT NULL DEFAULT ${0xFF2196F3},
+        repeat_type          TEXT,
+        lunar_month          INTEGER,
+        lunar_day            INTEGER
       )
     ''');
     await _createHolidaysTable(db);
@@ -48,6 +51,16 @@ class DatabaseHelper {
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) await _createHolidaysTable(db);
+    if (oldVersion < 3) {
+      await db.execute(
+          'ALTER TABLE $tableSchedules ADD COLUMN repeat_type TEXT');
+    }
+    if (oldVersion < 4) {
+      await db.execute(
+          'ALTER TABLE $tableSchedules ADD COLUMN lunar_month INTEGER');
+      await db.execute(
+          'ALTER TABLE $tableSchedules ADD COLUMN lunar_day INTEGER');
+    }
   }
 
   Future<void> _createHolidaysTable(Database db) async {
@@ -96,6 +109,17 @@ class DatabaseHelper {
       where: "solar_date LIKE ?",
       whereArgs: ['$yearMonth-%'],
       orderBy: 'solar_date ASC, time ASC',
+    );
+    return rows.map(Schedule.fromMap).toList();
+  }
+
+  /// 음력 매년 반복 일정 전체 반환 (달력 표시 계산용)
+  Future<List<Schedule>> getLunarYearlySchedules() async {
+    final db = await database;
+    final rows = await db.query(
+      tableSchedules,
+      where: 'is_lunar = 1 AND repeat_type = ?',
+      whereArgs: ['yearly'],
     );
     return rows.map(Schedule.fromMap).toList();
   }

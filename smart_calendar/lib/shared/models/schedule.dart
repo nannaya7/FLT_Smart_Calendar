@@ -7,6 +7,9 @@ class Schedule {
   final bool isLunar;
   final int? alarmMinutesBefore;
   final int categoryColor;
+  final String? repeatType; // null | 'daily' | 'monthly' | 'yearly'
+  final int? lunarMonth;   // isLunar=true 일 때 음력 월
+  final int? lunarDay;     // isLunar=true 일 때 음력 일
 
   const Schedule({
     this.id,
@@ -17,6 +20,9 @@ class Schedule {
     this.isLunar = false,
     this.alarmMinutesBefore,
     this.categoryColor = 0xFF2196F3,
+    this.repeatType,
+    this.lunarMonth,
+    this.lunarDay,
   });
 
   Map<String, dynamic> toMap() {
@@ -29,6 +35,9 @@ class Schedule {
       'is_lunar': isLunar ? 1 : 0,
       'alarm_minutes_before': alarmMinutesBefore,
       'category_color': categoryColor,
+      'repeat_type': repeatType,
+      'lunar_month': lunarMonth,
+      'lunar_day': lunarDay,
     };
   }
 
@@ -42,6 +51,9 @@ class Schedule {
       isLunar: (map['is_lunar'] as int) == 1,
       alarmMinutesBefore: map['alarm_minutes_before'] as int?,
       categoryColor: map['category_color'] as int,
+      repeatType: map['repeat_type'] as String?,
+      lunarMonth: map['lunar_month'] as int?,
+      lunarDay: map['lunar_day'] as int?,
     );
   }
 
@@ -54,6 +66,7 @@ class Schedule {
     bool? isLunar,
     int? alarmMinutesBefore,
     int? categoryColor,
+    Object? repeatType = _sentinel,
   }) {
     return Schedule(
       id: id ?? this.id,
@@ -64,6 +77,9 @@ class Schedule {
       isLunar: isLunar ?? this.isLunar,
       alarmMinutesBefore: alarmMinutesBefore ?? this.alarmMinutesBefore,
       categoryColor: categoryColor ?? this.categoryColor,
+      repeatType: repeatType == _sentinel ? this.repeatType : repeatType as String?,
     );
   }
+
+  static const _sentinel = Object();
 }

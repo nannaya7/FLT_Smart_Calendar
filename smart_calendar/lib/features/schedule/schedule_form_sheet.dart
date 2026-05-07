@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/calendar_engine.dart';
 import '../../core/db/database_helper.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../shared/models/schedule.dart';
@@ -16,6 +17,18 @@ enum _Alarm {
   const _Alarm(this.label, this.minutes);
 }
 
+enum _Repeat {
+  none('없음'),
+  daily('매일'),
+  monthly('매월'),
+  yearly('매년');
+
+  final String label;
+  const _Repeat(this.label);
+
+  String? get value => this == none ? null : name;
+}
+
 class ScheduleFormSheet extends StatefulWidget {
   final DateTime date;
   const ScheduleFormSheet({super.key, required this.date});
@@ -29,10 +42,22 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
   final _memoCtrl = TextEditingController();
   TimeOfDay? _time;
   _Alarm _alarm = _Alarm.none;
+  _Repeat _repeat = _Repeat.none;
+  bool _isLunar = false;
+  late int _lunarMonth;
+  late int _lunarDay;
   bool _saving = false;
 
   static const _bg = Color(0xFF1A3535);
   static const _accent = Color(0xFFE8C090);
+
+  @override
+  void initState() {
+    super.initState();
+    final lunar = CalendarEngine.instance.solarToLunar(widget.date);
+    _lunarMonth = lunar.month;
+    _lunarDay = lunar.day;
+  }
 
   @override
   void dispose() {
@@ -54,39 +79,52 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
     if (title.isEmpty) return;
     setState(() => _saving = true);
 
-    final timeStr = _time == null
-        ? null
-        : '${_time!.hour.toString().padLeft(2, '0')}:'
-            '${_time!.minute.toString().padLeft(2, '0')}';
+    try {
+      final timeStr = _time == null
+          ? null
+          : '${_time!.hour.toString().padLeft(2, '0')}:'
+              '${_time!.minute.toString().padLeft(2, '0')}';
 
-    final schedule = Schedule(
-      title: title,
-      memo: _memoCtrl.text.trim().isEmpty ? null : _memoCtrl.text.trim(),
-      solarDate: _fmtDate(widget.date),
-      time: timeStr,
-      isLunar: false,
-      alarmMinutesBefore: _alarm.minutes,
-      categoryColor: 0xFF2196F3,
-    );
-
-    final id = await DatabaseHelper.instance.insertSchedule(schedule);
-
-    if (_alarm.minutes != null && _time != null) {
-      final notifyAt = DateTime(
-        widget.date.year,
-        widget.date.month,
-        widget.date.day,
-        _time!.hour,
-        _time!.minute,
-      ).subtract(Duration(minutes: _alarm.minutes!));
-      await NotificationService.instance.schedule(
-        id: id,
+      final schedule = Schedule(
         title: title,
-        at: notifyAt,
+        memo: _memoCtrl.text.trim().isEmpty ? null : _memoCtrl.text.trim(),
+        solarDate: _fmtDate(widget.date),
+        time: timeStr,
+        isLunar: _isLunar,
+        alarmMinutesBefore: _alarm.minutes,
+        categoryColor: 0xFF2196F3,
+        repeatType: _repeat.value,
+        lunarMonth: _isLunar ? _lunarMonth : null,
+        lunarDay: _isLunar ? _lunarDay : null,
       );
-    }
 
-    if (mounted) Navigator.of(context).pop(true);
+      final id = await DatabaseHelper.instance.insertSchedule(schedule);
+
+      if (_alarm.minutes != null && _time != null) {
+        final notifyAt = DateTime(
+          widget.date.year,
+          widget.date.month,
+          widget.date.day,
+          _time!.hour,
+          _time!.minute,
+        ).subtract(Duration(minutes: _alarm.minutes!));
+        await NotificationService.instance.schedule(
+          id: id,
+          title: title,
+          at: notifyAt,
+          repeatType: _repeat.value,
+        );
+      }
+
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('저장 실패: $e')),
+        );
+      }
+    }
   }
 
   static String _fmtDate(DateTime d) =>
@@ -122,10 +160,21 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold)),
-              const SizedBox(height: 2),
-              Text(_dateLabel(widget.date),
-                  style:
-                      const TextStyle(color: Colors.white54, fontSize: 13)),
+              const SizedBox(height: 10),
+              Row(children: [
+                _modeBtn('양력', !_isLunar,
+                    () => setState(() => _isLunar = false)),
+                const SizedBox(width: 8),
+                _modeBtn('음력', _isLunar,
+                    () => setState(() => _isLunar = true)),
+              ]),
+              const SizedBox(height: 6),
+              Text(
+                _isLunar
+                    ? '음력 $_lunarMonth월 $_lunarDay일'
+                    : _dateLabel(widget.date),
+                style: const TextStyle(color: Colors.white54, fontSize: 13),
+              ),
               const SizedBox(height: 18),
               _inputField(_titleCtrl, '제목 *'),
               const SizedBox(height: 10),
@@ -162,6 +211,18 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                       .toList(),
                 ),
               ],
+              const SizedBox(height: 16),
+              _label('반복'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _Repeat.values
+                    .map((r) => _chip(r.label,
+                        selected: _repeat == r,
+                        onTap: () => setState(() => _repeat = r)))
+                    .toList(),
+              ),
               const SizedBox(height: 24),
               Row(children: [
                 Expanded(
@@ -202,6 +263,28 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                 ),
               ]),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _modeBtn(String label, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? _accent : Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: selected ? null : Border.all(color: Colors.white24),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? const Color(0xFF3D1E0A) : Colors.white70,
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
           ),
         ),
       ),

@@ -31,4 +31,18 @@ class CalendarEngine {
       isSpecial: l.day == 1 || l.day == 15,
     );
   }
+
+  /// 양력 날짜 → 음력 날짜 (반환 DateTime의 year·month·day = 음력 연·월·일)
+  DateTime solarToLunar(DateTime solar) =>
+      LunarSolarConverter.convertSolarToLunar(solar);
+
+  /// 음력 연-월-일 → 양력 날짜 (변환 범위 초과 시 null)
+  DateTime? lunarToSolar(int lunarYear, int lunarMonth, int lunarDay) {
+    try {
+      return LunarSolarConverter.convertLunarToSolar(
+          DateTime(lunarYear, lunarMonth, lunarDay));
+    } catch (_) {
+      return null;
+    }
+  }
 }

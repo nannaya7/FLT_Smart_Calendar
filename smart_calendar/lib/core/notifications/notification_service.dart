@@ -40,8 +40,19 @@ class NotificationService {
     required int id,
     required String title,
     required DateTime at,
+    String? repeatType,
   }) async {
-    if (at.isBefore(DateTime.now())) return;
+    final isRepeating = repeatType != null;
+    if (!isRepeating && at.isBefore(DateTime.now())) return;
+
+    // daily → time, monthly → dayOfMonthAndTime, yearly → 단일 알림(플러그인 미지원)
+    DateTimeComponents? components;
+    if (repeatType == 'daily') {
+      components = DateTimeComponents.time;
+    } else if (repeatType == 'monthly') {
+      components = DateTimeComponents.dayOfMonthAndTime;
+    }
+
     await _plugin.zonedSchedule(
       id,
       'Smart Calendar',
@@ -58,6 +69,7 @@ class NotificationService {
         iOS: DarwinNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      matchDateTimeComponents: components,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );

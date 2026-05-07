@@ -6,7 +6,8 @@ import '../../core/api/holiday_api_service.dart';
 import '../../core/db/database_helper.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../shared/models/holiday.dart';
-import '../schedule/day_schedule_sheet.dart';
+import '../../shared/models/schedule.dart';
+import '../schedule/schedule_form_sheet.dart';
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key});
@@ -21,6 +22,8 @@ class _CalendarPageState extends State<CalendarPage> {
 
   /// 날짜 키("YYYY-MM-DD") → 해당 날짜 일정 수
   Map<String, int> _scheduleCounts = {};
+
+  List<Schedule> _selectedDaySchedules = [];
 
   /// 날짜 키("YYYY-MM-DD") → 공휴일 or 절기 정보
   final Map<String, Holiday> _holidays = {};
@@ -78,10 +81,32 @@ class _CalendarPageState extends State<CalendarPage> {
     final ym =
         '${month.year}-${month.month.toString().padLeft(2, '0')}';
     final list = await DatabaseHelper.instance.getSchedulesByMonth(ym);
+
+    // 음력 매년 반복 일정 → 이 달에 해당하는 양력 날짜 계산
+    final lunarYearly =
+        await DatabaseHelper.instance.getLunarYearlySchedules();
+    final lunarKeys = <String>[];
+    for (final s in lunarYearly) {
+      if (s.lunarMonth != null && s.lunarDay != null) {
+        final solar =
+            _engine.lunarToSolar(month.year, s.lunarMonth!, s.lunarDay!);
+        if (solar != null &&
+            solar.year == month.year &&
+            solar.month == month.month) {
+          lunarKeys.add(_dateKey(solar));
+        }
+      }
+    }
+
     if (!mounted) return;
     final counts = <String, int>{};
+    // 음력 매년 반복은 lunarKeys에서 카운트하므로 regular에서 제외
     for (final s in list) {
+      if (s.isLunar && s.repeatType == 'yearly') continue;
       counts[s.solarDate] = (counts[s.solarDate] ?? 0) + 1;
+    }
+    for (final key in lunarKeys) {
+      counts[key] = (counts[key] ?? 0) + 1;
     }
     setState(() => _scheduleCounts = counts);
   }
@@ -91,14 +116,6 @@ class _CalendarPageState extends State<CalendarPage> {
   static String _dateKey(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-'
       '${d.day.toString().padLeft(2, '0')}';
-
-  String get _seasonText {
-    final m = _focusedDay.month;
-    if (m >= 3 && m <= 5) return '봄이 살랑살랑...';
-    if (m >= 6 && m <= 8) return '여름이 활짝...';
-    if (m >= 9 && m <= 11) return '가을이 물들어...';
-    return '겨울이 꿈꾸고...';
-  }
 
   void _goToPrev() {
     final d = DateTime(_focusedDay.year, _focusedDay.month - 1);
@@ -119,14 +136,50 @@ class _CalendarPageState extends State<CalendarPage> {
       _selectedDay = selected;
       _focusedDay = focused;
     });
+    await _loadSelectedDaySchedules(selected);
+  }
+
+  Future<void> _loadSelectedDaySchedules(DateTime day) async {
+    final regular =
+        await DatabaseHelper.instance.getSchedulesByDate(_dateKey(day));
+
+    // 이 날의 음력 월·일에 해당하는 음력 매년 반복 일정 (regular에 없는 것만)
+    final lunar = _engine.solarToLunar(day);
+    final lunarYearly =
+        await DatabaseHelper.instance.getLunarYearlySchedules();
+    final regularIds = regular.map((s) => s.id).toSet();
+    final matching = lunarYearly.where((s) =>
+        s.lunarMonth == lunar.month &&
+        s.lunarDay == lunar.day &&
+        !regularIds.contains(s.id));
+
     if (!mounted) return;
+    setState(() => _selectedDaySchedules = [...regular, ...matching]);
+  }
+
+  Future<void> _openAddForm() async {
+    if (_selectedDay == null) return;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DayScheduleSheet(date: selected),
+      builder: (_) => ScheduleFormSheet(date: _selectedDay!),
     );
-    if (mounted) _loadSchedules(focused);
+    if (mounted && _selectedDay != null) {
+      await _loadSelectedDaySchedules(_selectedDay!);
+      _loadSchedules(_focusedDay);
+    }
+  }
+
+  Future<void> _deleteSchedule(Schedule s) async {
+    await DatabaseHelper.instance.deleteSchedule(s.id!);
+    if (s.alarmMinutesBefore != null) {
+      await NotificationService.instance.cancel(s.id!);
+    }
+    if (mounted && _selectedDay != null) {
+      await _loadSelectedDaySchedules(_selectedDay!);
+      _loadSchedules(_focusedDay);
+    }
   }
 
   // ── 빌드 ────────────────────────────────────────────────────────────────────
@@ -137,9 +190,9 @@ class _CalendarPageState extends State<CalendarPage> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF3A7272), Color(0xFFCC7840)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF97867B), Color(0xFF807169)],
           ),
         ),
         child: SafeArea(
@@ -147,9 +200,11 @@ class _CalendarPageState extends State<CalendarPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               Expanded(child: _buildCalendar()),
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
+              SizedBox(height: 190, child: _buildInfoPanel()),
+              const SizedBox(height: 4),
             ],
           ),
         ),
@@ -170,15 +225,6 @@ class _CalendarPageState extends State<CalendarPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _months[_focusedDay.month - 1],
-                  style: const TextStyle(
-                    fontSize: 50,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF5C2A10),
-                    height: 1.0,
-                  ),
-                ),
-                Text(
                   '${_focusedDay.year}년',
                   style: const TextStyle(
                     fontSize: 38,
@@ -187,13 +233,13 @@ class _CalendarPageState extends State<CalendarPage> {
                     height: 1.1,
                   ),
                 ),
-                const SizedBox(height: 6),
                 Text(
-                  _seasonText,
+                  _months[_focusedDay.month - 1],
                   style: const TextStyle(
-                    fontSize: 14,
-                    fontStyle: FontStyle.italic,
+                    fontSize: 50,
+                    fontWeight: FontWeight.bold,
                     color: Color(0xFF5C2A10),
+                    height: 1.0,
                   ),
                 ),
               ],
@@ -218,10 +264,10 @@ class _CalendarPageState extends State<CalendarPage> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: const Color(0x80203C3C),
+        color: const Color(0xFFEDE4D4),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.12),
+          color: const Color(0xFFCEC5B4),
           width: 1,
         ),
       ),
@@ -240,7 +286,7 @@ class _CalendarPageState extends State<CalendarPage> {
           },
           headerVisible: false,
           startingDayOfWeek: StartingDayOfWeek.sunday,
-          rowHeight: 64,
+          rowHeight: 82,
           calendarStyle: const CalendarStyle(
             outsideDaysVisible: false,
             cellMargin: EdgeInsets.zero,
@@ -260,6 +306,233 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
+  // ── 인라인 정보창 ─────────────────────────────────────────────────────────────
+
+  static const _weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];
+
+  Widget _buildInfoPanel() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEDE4D4),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFCEC5B4), width: 1),
+      ),
+      child: _selectedDay == null ? _panelPlaceholder() : _panelContent(),
+    );
+  }
+
+  Widget _panelPlaceholder() => const Center(
+        child: Text(
+          '날짜를 선택하면 일정이 표시됩니다',
+          style: TextStyle(color: Color(0xFFAA9898), fontSize: 13),
+        ),
+      );
+
+  Widget _panelContent() {
+    final d = _selectedDay!;
+    final label = '${d.month}월 ${d.day}일 (${_weekdayNames[d.weekday - 1]})';
+
+    // 음력 날짜
+    final lunar = _engine.solarToLunar(d);
+    final lunarLabel = '(음) ${lunar.month}월 ${lunar.day}일';
+
+    // 절기 / 공휴일 / 전통명절 정보
+    final apiEntry = _holidays[_dateKey(d)];
+    final cellInfo = _engine.cellInfo(d);
+    String? specialLabel;
+    Color specialColor = const Color(0xFF80E080);
+    if (apiEntry != null) {
+      specialLabel = apiEntry.name;
+      specialColor = apiEntry.type == 'solar_term'
+          ? const Color(0xFF4CAF50)
+          : const Color(0xFFFF8A65);
+    } else if (cellInfo.holiday != null) {
+      specialLabel = cellInfo.holiday;
+      specialColor = const Color(0xFFFF8A65);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 8, 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          label,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2D2B3A),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          lunarLabel,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFFB8920A),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (specialLabel != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          specialLabel,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: specialColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              GestureDetector(
+                onTap: _openAddForm,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8C090),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    '+ 일정 추가',
+                    style: TextStyle(
+                      color: Color(0xFF3D1E0A),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1, color: Color(0xFFCEC5B4)),
+        Expanded(
+          child: _selectedDaySchedules.isEmpty
+              ? const Center(
+                  child: Text(
+                    '등록된 일정이 없습니다',
+                    style: TextStyle(color: Color(0xFFAA9898), fontSize: 13),
+                  ),
+                )
+              : ListView.separated(
+                  itemCount: _selectedDaySchedules.length,
+                  separatorBuilder: (_, _) =>
+                      const Divider(height: 1, color: Color(0xFFCEC5B4)),
+                  itemBuilder: (_, i) {
+                    final s = _selectedDaySchedules[i];
+                    return Dismissible(
+                      key: Key('sp_${s.id}'),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFF6B6B),
+                          borderRadius: BorderRadius.only(
+                            bottomRight: Radius.circular(16),
+                            bottomLeft: Radius.circular(16),
+                          ),
+                        ),
+                        child: const Icon(Icons.delete_outline,
+                            color: Colors.white),
+                      ),
+                      onDismissed: (_) => _deleteSchedule(s),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 4,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: Color(s.categoryColor),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    s.title,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF2D2B3A),
+                                    ),
+                                  ),
+                                  if (s.time != null || s.memo != null) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      [
+                                        if (s.time != null) s.time!,
+                                        if (s.memo != null) s.memo!,
+                                      ].join('  ·  '),
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFFAA9898)),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            if (s.isLunar)
+                              Container(
+                                margin: const EdgeInsets.only(left: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFB8920A)
+                                      .withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text('음력',
+                                    style: TextStyle(
+                                        fontSize: 10,
+                                        color: Color(0xFFB8920A),
+                                        fontWeight: FontWeight.w600)),
+                              ),
+                            if (s.repeatType != null)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 4),
+                                child: Icon(Icons.repeat,
+                                    color: Color(0xFF8B7CB8), size: 15),
+                              ),
+                            if (s.alarmMinutesBefore != null)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 4),
+                                child: Icon(Icons.notifications_outlined,
+                                    color: Color(0xFFAA9898), size: 16),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
   // ── 요일 헤더 셀 ────────────────────────────────────────────────────────────
 
   Widget _dowCell(DateTime day) {
@@ -270,17 +543,17 @@ class _CalendarPageState extends State<CalendarPage> {
     final isSun = day.weekday == DateTime.sunday;
     final isSat = day.weekday == DateTime.saturday;
     return Container(
-      color: const Color(0xFF1B3A3A),
+      color: const Color(0xFFDDD4C4),
       alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Text(
         names[day.weekday] ?? '',
         style: TextStyle(
           color: isSun
-              ? const Color(0xFFFF7070)
+              ? const Color(0xFF8B7CB8)
               : isSat
                   ? const Color(0xFF70A8FF)
-                  : Colors.white60,
+                  : const Color(0xFF4A4865),
           fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
@@ -303,40 +576,44 @@ class _CalendarPageState extends State<CalendarPage> {
 
     // 날짜 숫자 색상: API 공휴일 / 일요일만 빨강 (음력 전통명절은 제외)
     final Color dayColor = (isPublicHoliday || isSun)
-        ? const Color(0xFFFF7070)
+        ? const Color(0xFF8B7CB8)
         : isSat
             ? const Color(0xFF70A8FF)
-            : Colors.white;
+            : const Color(0xFF2D2B3A);
 
     // 하단 텍스트: API 데이터 우선 → 음력명절 → 음력날짜
     final String subText;
     final Color subColor;
+    final double subFontSize;
     if (apiEntry != null) {
       subText = apiEntry.name;
       subColor = isSolarTerm
           ? const Color(0xFF80E080)   // 절기 → 초록
           : const Color(0xFFFFAA88);  // 공휴일 → 주황
+      subFontSize = 13;
     } else if (info.holiday != null) {
       subText = info.holiday!;
       subColor = const Color(0xFFFFAA88);
+      subFontSize = 13;
     } else {
       subText = info.lunarLabel;
-      subColor = info.isSpecial ? const Color(0xFFFFD060) : Colors.white38;
+      subColor = info.isSpecial ? const Color(0xFFB8920A) : const Color(0xFFAA9898);
+      subFontSize = 18;
     }
 
     return Center(
       child: Container(
-        width: 44,
-        height: 58,
+        width: 52,
+        height: 74,
         decoration: isSelected
             ? BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white70, width: 1.5),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.grey, width: 1.5),
               )
             : isToday
                 ? BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(10),
+                    color: const Color(0xFF8B7CB8).withValues(alpha: 0.18),
                   )
                 : null,
         child: Column(
@@ -347,8 +624,8 @@ class _CalendarPageState extends State<CalendarPage> {
               '${day.day}',
               style: TextStyle(
                 color: dayColor,
-                fontSize: 22.5,
-                fontWeight: FontWeight.w500,
+                fontSize: 27,
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 1),
@@ -357,7 +634,7 @@ class _CalendarPageState extends State<CalendarPage> {
               subText,
               style: TextStyle(
                 color: subColor,
-                fontSize: 12,
+                fontSize: subFontSize,
                 fontWeight: (info.isSpecial || info.holiday != null)
                     ? FontWeight.w600
                     : FontWeight.normal,
