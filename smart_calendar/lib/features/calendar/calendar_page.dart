@@ -37,6 +37,10 @@ class _CalendarPageState extends State<CalendarPage> {
     '7월', '8월', '9월', '10월', '11월', '12월',
   ];
 
+  static const _rowHeight = 80.0; // ← 날짜 행 높이
+  static const _dowHeight = 32.0; // ← 요일 헤더 행 높이
+
+
   // ── 라이프사이클 ────────────────────────────────────────────────────────────
 
   @override
@@ -201,10 +205,19 @@ class _CalendarPageState extends State<CalendarPage> {
             children: [
               _buildHeader(),
               const SizedBox(height: 8),
-              Expanded(child: _buildCalendar()),
-              const SizedBox(height: 4),
-              SizedBox(height: 190, child: _buildInfoPanel()),
-              const SizedBox(height: 4),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  child: Column(
+                    children: [
+                      _buildCalendar(),
+                      const SizedBox(height: 4),
+                      SizedBox(height: 190, child: _buildInfoPanel()),
+                      const SizedBox(height: 4),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -286,18 +299,18 @@ class _CalendarPageState extends State<CalendarPage> {
           },
           headerVisible: false,
           startingDayOfWeek: StartingDayOfWeek.sunday,
-          rowHeight: 82,
+          rowHeight: _rowHeight,
+          daysOfWeekHeight: _dowHeight,
           calendarStyle: const CalendarStyle(
             outsideDaysVisible: false,
             cellMargin: EdgeInsets.zero,
             cellPadding: EdgeInsets.zero,
           ),
           calendarBuilders: CalendarBuilders(
-            // 요일 헤더
             dowBuilder: (context, day) => _dowCell(day),
-            // 날짜 셀
             defaultBuilder: (context, day, _) => _dayCell(day),
-            todayBuilder: (context, day, _) => _dayCell(day, isToday: true),
+            todayBuilder: (context, day, _) =>
+                _dayCell(day, isToday: true),
             selectedBuilder: (context, day, _) =>
                 _dayCell(day, isSelected: true),
           ),
@@ -604,7 +617,7 @@ class _CalendarPageState extends State<CalendarPage> {
     return Center(
       child: Container(
         width: 52,
-        height: 74,
+        height: _rowHeight - 8,
         decoration: isSelected
             ? BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
@@ -624,11 +637,33 @@ class _CalendarPageState extends State<CalendarPage> {
               '${day.day}',
               style: TextStyle(
                 color: dayColor,
-                fontSize: 27,
+                fontSize: 23, // ← 날짜 숫자 폰트 크기
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 1),
+            // 일정 Dot 마커 — 날짜 숫자 바로 아래 (최대 3개, 고정 높이로 레이아웃 안정)
+            SizedBox(
+              height: 3, // ← 날짜 숫자↔음력 텍스트 사이 간격 / 도트 영역 높이
+              child: scheduleCount > 0
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(
+                        scheduleCount.clamp(1, 3),
+                        (_) => Container(
+                          width: 5,
+                          height: 5,
+                          margin:
+                              const EdgeInsets.symmetric(horizontal: 1.5),
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color(0xFF8B7CB8),
+                          ),
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
             // 음력 날짜 또는 명절 이름
             Text(
               subText,
@@ -640,26 +675,6 @@ class _CalendarPageState extends State<CalendarPage> {
                     : FontWeight.normal,
               ),
             ),
-            // 일정 Dot 마커 (최대 3개)
-            if (scheduleCount > 0) ...[
-              const SizedBox(height: 3),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: List.generate(
-                  scheduleCount.clamp(1, 3),
-                  (_) => Container(
-                    width: 4,
-                    height: 4,
-                    margin: const EdgeInsets.symmetric(horizontal: 1),
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFFFFD060),
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
       ),

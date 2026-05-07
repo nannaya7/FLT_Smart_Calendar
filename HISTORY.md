@@ -1,5 +1,55 @@
 # 개발 히스토리
 
+## V.0.00.510 — 2026-05-07
+
+### 문서 정리
+- `HISTORY.md` 생성 (개발 히스토리 문서화)
+- `README.md` 현행 기능 기준으로 전면 갱신 (DB 스키마 v4, 반복·음력 기능 반영)
+- `Korean_holiday.md` → `doc/Korean_holiday.md` 이동
+- `smart_calendar_v1.md` → `doc/smart_calendar_v1.md` 이동
+
+---
+
+## V.0.00.500 — 2026-05-07
+
+### 반복 일정 + 음력 일정 등록 + 인라인 패널 전환
+
+#### DB 스키마 v4
+- `schedules` 테이블에 컬럼 3개 추가
+  - `repeat_type TEXT` — `null` | `'daily'` | `'monthly'` | `'yearly'`
+  - `lunar_month INTEGER` — 음력 월 (is_lunar=1 일 때)
+  - `lunar_day INTEGER` — 음력 일 (is_lunar=1 일 때)
+- `_dbVersion` 2 → 4 (`_onUpgrade` v3·v4 마이그레이션 각각 적용)
+- `getLunarYearlySchedules()` 메서드 추가 — 음력 매년 반복 일정 전체 조회
+
+#### 음력 변환 API (`CalendarEngine`)
+- `solarToLunar(DateTime)` 추가 — 양력 → 음력 변환
+- `lunarToSolar(year, month, day)` 추가 — 음력 → 양력 환산 (범위 초과 시 null)
+
+#### 일정 등록 (`ScheduleFormSheet`)
+- 양력 / 음력 모드 토글 (`_isLunar` 상태)
+- 음력 선택 시 `lunarMonth` · `lunarDay` 필드에 변환값 저장
+- 반복 칩 UI 추가: 없음 / 매일 / 매월 / 매년
+- 알림 반복 처리: `DateTimeComponents.time`(매일), `dayOfMonthAndTime`(매월), 단발(매년 — 플러그인 미지원)
+
+#### 달력 UI (`CalendarPage`)
+- BottomSheet 방식 → 하단 고정 인라인 패널(`height: 190`)으로 전환
+- 패널 헤더: 양력·음력 날짜 동시 표기 + 해당일 절기·명절 서브텍스트
+- 일정 아이템에 음력 배지(amber) 및 반복 아이콘(purple) 표시
+- 음력 매년 반복 일정: `getLunarYearlySchedules()`로 매년 양력 환산일에 자동 표시
+- Dot 마커 집계 개선: 음력 매년 반복 일정 중복 카운트 제거
+
+#### 버그 수정
+- 음력 매년 반복 일정이 패널에 2개 중복 표시되던 문제 수정
+  - 원인: `getSchedulesByDate()`와 `getLunarYearlySchedules()` 두 경로가 동일 레코드 반환
+  - 수정: 정규 조회 ID 셋(`regularIds`)으로 음력 결과 중복 필터링
+
+#### Android 빌드 설정
+- `build.gradle.kts`에 `isCoreLibraryDesugaringEnabled = true` 및 `desugar_jdk_libs:2.1.4` 추가
+  (Java 8+ API 하위 호환 — `timezone` 패키지 요구사항)
+
+---
+
 ## V.0.00.220 — 2026-05-07
 
 ### UI 개선
