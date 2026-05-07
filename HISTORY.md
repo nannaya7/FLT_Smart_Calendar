@@ -1,5 +1,40 @@
 # 개발 히스토리
 
+## V.0.00.220 — 2026-05-07
+
+### UI 개선
+- 전체 배경 그라디언트를 웜 브라운 계열로 변경 (`#97867B → #807169`)
+- 계절 텍스트 필 제거 → 달력 보드를 상단으로 올려 공간 확보
+- 날짜 선택 데코레이션: 원형 → 라운드 사각형 회색 테두리 (`BorderRadius.circular(10)`, `Colors.grey`)
+
+### 인라인 일정 패널 (모달 → 인라인 전환)
+- 날짜 탭 시 BottomSheet 팝업 대신 하단 고정 패널(`height: 190`)에 일정 표시
+- `day_schedule_sheet.dart` 역할을 `calendar_page.dart` 내 `_buildInfoPanel()` / `_panelContent()`로 통합
+- 패널 헤더에 양력·음력 날짜 동시 표기, 해당일 음력 절기·명절 서브텍스트 표시
+- 일정 아이템에 음력 배지(amber) 및 반복 아이콘(purple) 추가
+
+### 일정 반복 기능
+- 반복 유형 3종 추가: 매일(`daily`) / 매월(`monthly`) / 매년(`yearly`)
+- `ScheduleFormSheet`에 반복 칩 UI 추가
+- 알림 반복: `DateTimeComponents.time` (매일), `dayOfMonthAndTime` (매월), 단발(매년 — 플러그인 한계)
+
+### 음력 일정 등록
+- 일정 등록 시 양력/음력 모드 토글 (`_isLunar` 상태)
+- 음력 선택 시 변환된 음력 월·일 저장 (`lunarMonth`, `lunarDay` 필드)
+- 음력 매년 반복 일정: 매년 해당 음력 날짜의 양력 환산일에 자동 표시
+
+### DB 스키마 v4
+- `repeat_type TEXT` 컬럼 추가 (`null` | `'daily'` | `'monthly'` | `'yearly'`)
+- `lunar_month INTEGER`, `lunar_day INTEGER` 컬럼 추가
+- `getLunarYearlySchedules()` 쿼리 메서드 추가
+
+### 버그 수정
+- 음력 매년 반복 일정이 패널에 2개 중복 표시되던 문제 수정
+  - 원인: `getSchedulesByDate()`와 `getLunarYearlySchedules()` 두 경로가 동일 레코드 반환
+  - 수정: 정규 조회 ID 셋(`regularIds`)으로 음력 결과 필터링, 점 마커 집계에서 `isLunar && yearly` 스킵
+
+---
+
 ## V.0.00.210 — 2026-05-06
 
 ### UI 개선
