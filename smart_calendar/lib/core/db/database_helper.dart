@@ -124,6 +124,17 @@ class DatabaseHelper {
     return rows.map(Schedule.fromMap).toList();
   }
 
+  /// 반복 타입이 있는 일정 전체 반환
+  Future<List<Schedule>> getAllRepeatSchedules() async {
+    final db = await database;
+    final rows = await db.query(
+      tableSchedules,
+      where: 'repeat_type IS NOT NULL',
+      orderBy: 'solar_date ASC',
+    );
+    return rows.map(Schedule.fromMap).toList();
+  }
+
   Future<Schedule?> getScheduleById(int id) async {
     final db = await database;
     final rows = await db.query(tableSchedules, where: 'id = ?', whereArgs: [id]);
@@ -176,6 +187,12 @@ class DatabaseHelper {
       whereArgs: ['$year-%'],
     );
     return rows.map(Holiday.fromMap).toList();
+  }
+
+  Future<void> clearHolidaysByYear(int year) async {
+    final db = await database;
+    await db.delete(tableHolidays,
+        where: "date LIKE ?", whereArgs: ['$year-%']);
   }
 
   Future<bool> hasHolidaysForYear(int year) async {

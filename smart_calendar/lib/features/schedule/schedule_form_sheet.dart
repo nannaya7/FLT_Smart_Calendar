@@ -31,7 +31,8 @@ enum _Repeat {
 
 class ScheduleFormSheet extends StatefulWidget {
   final DateTime date;
-  const ScheduleFormSheet({super.key, required this.date});
+  final Schedule? initialSchedule;
+  const ScheduleFormSheet({super.key, required this.date, this.initialSchedule});
 
   @override
   State<ScheduleFormSheet> createState() => _ScheduleFormSheetState();
@@ -51,12 +52,35 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
   static const _bg = Color(0xFF1A3535);
   static const _accent = Color(0xFFE8C090);
 
+  bool get _isEditing => widget.initialSchedule != null;
+
   @override
   void initState() {
     super.initState();
     final lunar = CalendarEngine.instance.solarToLunar(widget.date);
     _lunarMonth = lunar.month;
     _lunarDay = lunar.day;
+
+    final s = widget.initialSchedule;
+    if (s != null) {
+      _titleCtrl.text = s.title;
+      _memoCtrl.text = s.memo ?? '';
+      _isLunar = s.isLunar;
+      if (s.lunarMonth != null) _lunarMonth = s.lunarMonth!;
+      if (s.lunarDay != null) _lunarDay = s.lunarDay!;
+      if (s.time != null) {
+        final parts = s.time!.split(':');
+        _time = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+      }
+      _alarm = _Alarm.values.firstWhere(
+        (a) => a.minutes == s.alarmMinutesBefore,
+        orElse: () => _Alarm.none,
+      );
+      _repeat = _Repeat.values.firstWhere(
+        (r) => r.value == s.repeatType,
+        orElse: () => _Repeat.none,
+      );
+    }
   }
 
   @override
@@ -86,19 +110,29 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
               '${_time!.minute.toString().padLeft(2, '0')}';
 
       final schedule = Schedule(
+        id: widget.initialSchedule?.id,
         title: title,
         memo: _memoCtrl.text.trim().isEmpty ? null : _memoCtrl.text.trim(),
         solarDate: _fmtDate(widget.date),
         time: timeStr,
         isLunar: _isLunar,
         alarmMinutesBefore: _alarm.minutes,
-        categoryColor: 0xFF2196F3,
+        categoryColor: widget.initialSchedule?.categoryColor ?? 0xFF2196F3,
         repeatType: _repeat.value,
         lunarMonth: _isLunar ? _lunarMonth : null,
         lunarDay: _isLunar ? _lunarDay : null,
       );
 
-      final id = await DatabaseHelper.instance.insertSchedule(schedule);
+      int id;
+      if (_isEditing) {
+        await DatabaseHelper.instance.updateSchedule(schedule);
+        id = schedule.id!;
+        if (widget.initialSchedule!.alarmMinutesBefore != null) {
+          await NotificationService.instance.cancel(id);
+        }
+      } else {
+        id = await DatabaseHelper.instance.insertSchedule(schedule);
+      }
 
       if (_alarm.minutes != null && _time != null) {
         final notifyAt = DateTime(
@@ -155,8 +189,8 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
             children: [
               _handle(),
               const SizedBox(height: 14),
-              const Text('일정 추가',
-                  style: TextStyle(
+              Text(_isEditing ? '일정 수정' : '일정 추가',
+                  style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold)),

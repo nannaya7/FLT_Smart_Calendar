@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../core/calendar_engine.dart';
+import '../../core/api/google_calendar_service.dart';
 import '../../core/api/holiday_api_service.dart';
 import '../../core/db/database_helper.dart';
 import '../../core/notifications/notification_service.dart';
@@ -30,7 +33,8 @@ class _CalendarPageState extends State<CalendarPage> {
   final Set<int> _loadedHolidayYears = {};
 
   final _engine = CalendarEngine.instance;
-  final _apiService = HolidayApiService();
+  final _googleService = GoogleCalendarService();
+  final _apiService = HolidayApiService(); // 24절기 전용
 
   static const _months = [
     '1월', '2월', '3월', '4월', '5월', '6월',
@@ -48,20 +52,55 @@ class _CalendarPageState extends State<CalendarPage> {
     super.initState();
     _loadSchedules(_focusedDay);
     _loadHolidays(_focusedDay.year);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       NotificationService.instance.requestAndroidPermission();
+      await _refreshHolidaysIfNeeded();
     });
   }
 
-  Future<void> _loadHolidays(int year) async {
-    if (_loadedHolidayYears.contains(year)) return;
+  /// 최초 설치 또는 월말일에 공휴일 데이터를 갱신한다.
+  Future<void> _refreshHolidaysIfNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now();
+
+    // ── 최초 설치: 올해 + 내년 데이터 프리패치
+    final initialized = prefs.getBool('holiday_initialized') ?? false;
+    if (!initialized) {
+      await Future.wait([
+        _loadHolidays(now.year, forceRefresh: true),
+        _loadHolidays(now.year + 1, forceRefresh: true),
+      ]);
+      await prefs.setBool('holiday_initialized', true);
+      return;
+    }
+
+    // ── 월말일: 다음 달(연도)의 데이터 강제 갱신 (오늘 이미 했으면 건너뜀)
+    final lastDayOfMonth = DateTime(now.year, now.month + 1, 0).day;
+    if (now.day != lastDayOfMonth) return;
+
+    final refreshKey = 'holiday_refreshed_${now.year}_${now.month}';
+    if (prefs.getBool(refreshKey) ?? false) return;
+
+    final nextMonth = DateTime(now.year, now.month + 1);
+    await _loadHolidays(nextMonth.year, forceRefresh: true);
+    await prefs.setBool(refreshKey, true);
+  }
+
+  Future<void> _loadHolidays(int year, {bool forceRefresh = false}) async {
+    if (!forceRefresh && _loadedHolidayYears.contains(year)) return;
+
+    if (forceRefresh) {
+      await DatabaseHelper.instance.clearHolidaysByYear(year);
+      _loadedHolidayYears.remove(year);
+    }
 
     final cached = await DatabaseHelper.instance.getHolidaysByYear(year);
     List<Holiday> all;
 
     if (cached.isEmpty) {
+      // 공휴일: Google Calendar / 24절기: 공공데이터포털
       final results = await Future.wait([
-        _apiService.fetchHolidays(year),
+        _googleService.fetchHolidays(year),
         _apiService.fetchSolarTerms(year),
       ]);
       all = [...results[0], ...results[1]];
@@ -82,36 +121,28 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Future<void> _loadSchedules(DateTime month) async {
-    final ym =
-        '${month.year}-${month.month.toString().padLeft(2, '0')}';
+    final ym = '${month.year}-${month.month.toString().padLeft(2, '0')}';
+
+    // 비반복 일정: 이 달에 등록된 것만
     final list = await DatabaseHelper.instance.getSchedulesByMonth(ym);
 
-    // 음력 매년 반복 일정 → 이 달에 해당하는 양력 날짜 계산
-    final lunarYearly =
-        await DatabaseHelper.instance.getLunarYearlySchedules();
-    final lunarKeys = <String>[];
-    for (final s in lunarYearly) {
-      if (s.lunarMonth != null && s.lunarDay != null) {
-        final solar =
-            _engine.lunarToSolar(month.year, s.lunarMonth!, s.lunarDay!);
-        if (solar != null &&
-            solar.year == month.year &&
-            solar.month == month.month) {
-          lunarKeys.add(_dateKey(solar));
-        }
-      }
-    }
+    // 반복 일정 전체: 이 달에 해당하는 날짜로 확장
+    final allRepeats = await DatabaseHelper.instance.getAllRepeatSchedules();
 
     if (!mounted) return;
     final counts = <String, int>{};
-    // 음력 매년 반복은 lunarKeys에서 카운트하므로 regular에서 제외
+
     for (final s in list) {
-      if (s.isLunar && s.repeatType == 'yearly') continue;
+      if (s.repeatType != null) continue; // 반복 일정은 아래에서 처리
       counts[s.solarDate] = (counts[s.solarDate] ?? 0) + 1;
     }
-    for (final key in lunarKeys) {
-      counts[key] = (counts[key] ?? 0) + 1;
+
+    for (final s in allRepeats) {
+      for (final key in _repeatDatesInMonth(s, month)) {
+        counts[key] = (counts[key] ?? 0) + 1;
+      }
     }
+
     setState(() => _scheduleCounts = counts);
   }
 
@@ -121,18 +152,82 @@ class _CalendarPageState extends State<CalendarPage> {
       '${d.year}-${d.month.toString().padLeft(2, '0')}-'
       '${d.day.toString().padLeft(2, '0')}';
 
-  void _goToPrev() {
-    final d = DateTime(_focusedDay.year, _focusedDay.month - 1);
-    setState(() => _focusedDay = d);
-    _loadSchedules(d);
-    _loadHolidays(d.year);
+  static int _daysInMonth(int year, int month) =>
+      DateTime(year, month + 1, 0).day;
+
+  /// 반복 일정이 주어진 달(month)에 나타나는 날짜 키 목록 반환
+  List<String> _repeatDatesInMonth(Schedule s, DateTime month) {
+    final reg = DateTime.parse(s.solarDate);
+    switch (s.repeatType) {
+      case 'daily':
+        final days = _daysInMonth(month.year, month.month);
+        return List.generate(
+          days,
+          (i) => _dateKey(DateTime(month.year, month.month, i + 1)),
+        );
+      case 'monthly':
+        if (s.isLunar) {
+          // 음력 매월: 이 달의 각 날짜에서 음력 day가 일치하는 날 탐색
+          if (s.lunarDay == null) return [];
+          final days = _daysInMonth(month.year, month.month);
+          final results = <String>[];
+          for (int d = 1; d <= days; d++) {
+            final solar = DateTime(month.year, month.month, d);
+            if (_engine.solarToLunar(solar).day == s.lunarDay) {
+              results.add(_dateKey(solar));
+              break; // 한 달에 한 번만
+            }
+          }
+          return results;
+        } else {
+          // 양력 매월: 등록일의 day를 현재 달에 적용
+          final day = reg.day;
+          if (day > _daysInMonth(month.year, month.month)) return [];
+          return [_dateKey(DateTime(month.year, month.month, day))];
+        }
+      case 'yearly':
+        if (s.isLunar) {
+          // 음력 매년: 이 연도의 해당 음력 날짜 → 양력 변환
+          if (s.lunarMonth == null || s.lunarDay == null) return [];
+          final solar = _engine.lunarToSolar(month.year, s.lunarMonth!, s.lunarDay!);
+          if (solar == null || solar.month != month.month) return [];
+          return [_dateKey(solar)];
+        } else {
+          // 양력 매년: 등록일의 월/day를 현재 연도에 적용
+          if (reg.month != month.month) return [];
+          final day = reg.day;
+          if (day > _daysInMonth(month.year, month.month)) return [];
+          return [_dateKey(DateTime(month.year, month.month, day))];
+        }
+      default:
+        return [];
+    }
   }
 
-  void _goToNext() {
-    final d = DateTime(_focusedDay.year, _focusedDay.month + 1);
-    setState(() => _focusedDay = d);
-    _loadSchedules(d);
-    _loadHolidays(d.year);
+  /// 반복 일정이 특정 날짜(day)에 해당하는지 확인
+  bool _isRepeatMatchingDay(Schedule s, DateTime day) {
+    final reg = DateTime.parse(s.solarDate);
+    switch (s.repeatType) {
+      case 'daily':
+        return true;
+      case 'monthly':
+        if (s.isLunar) {
+          if (s.lunarDay == null) return false;
+          return _engine.solarToLunar(day).day == s.lunarDay;
+        } else {
+          return day.day == reg.day;
+        }
+      case 'yearly':
+        if (s.isLunar) {
+          if (s.lunarMonth == null || s.lunarDay == null) return false;
+          final lunar = _engine.solarToLunar(day);
+          return lunar.month == s.lunarMonth && lunar.day == s.lunarDay;
+        } else {
+          return day.month == reg.month && day.day == reg.day;
+        }
+      default:
+        return false;
+    }
   }
 
   Future<void> _onDayTap(DateTime selected, DateTime focused) async {
@@ -144,18 +239,15 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Future<void> _loadSelectedDaySchedules(DateTime day) async {
+    // 이 날짜에 등록된 일정 (비반복 + 원래 이 날 등록된 반복 포함)
     final regular =
         await DatabaseHelper.instance.getSchedulesByDate(_dateKey(day));
-
-    // 이 날의 음력 월·일에 해당하는 음력 매년 반복 일정 (regular에 없는 것만)
-    final lunar = _engine.solarToLunar(day);
-    final lunarYearly =
-        await DatabaseHelper.instance.getLunarYearlySchedules();
     final regularIds = regular.map((s) => s.id).toSet();
-    final matching = lunarYearly.where((s) =>
-        s.lunarMonth == lunar.month &&
-        s.lunarDay == lunar.day &&
-        !regularIds.contains(s.id));
+
+    // 모든 반복 일정 중 이 날에 해당하는 것 추가 (중복 제외)
+    final allRepeats = await DatabaseHelper.instance.getAllRepeatSchedules();
+    final matching = allRepeats.where((s) =>
+        _isRepeatMatchingDay(s, day) && !regularIds.contains(s.id));
 
     if (!mounted) return;
     setState(() => _selectedDaySchedules = [...regular, ...matching]);
@@ -186,6 +278,20 @@ class _CalendarPageState extends State<CalendarPage> {
     }
   }
 
+  Future<void> _openEditForm(Schedule s) async {
+    final date = DateTime.parse(s.solarDate);
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ScheduleFormSheet(date: date, initialSchedule: s),
+    );
+    if (mounted && _selectedDay != null) {
+      await _loadSelectedDaySchedules(_selectedDay!);
+      _loadSchedules(_focusedDay);
+    }
+  }
+
   // ── 빌드 ────────────────────────────────────────────────────────────────────
 
   @override
@@ -201,23 +307,14 @@ class _CalendarPageState extends State<CalendarPage> {
         ),
         child: SafeArea(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildHeader(),
-              const SizedBox(height: 8),
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const ClampingScrollPhysics(),
-                  child: Column(
-                    children: [
-                      _buildCalendar(),
-                      const SizedBox(height: 4),
-                      SizedBox(height: 190, child: _buildInfoPanel()),
-                      const SizedBox(height: 4),
-                    ],
-                  ),
-                ),
-              ),
+              const SizedBox(height: 4),
+              _buildCalendar(),
+              const SizedBox(height: 6),
+              Expanded(child: _buildInfoPanel()),
+              const SizedBox(height: 6),
             ],
           ),
         ),
@@ -229,44 +326,18 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 16, 0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${_focusedDay.year}년',
-                  style: const TextStyle(
-                    fontSize: 38,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF5C2A10),
-                    height: 1.1,
-                  ),
-                ),
-                Text(
-                  _months[_focusedDay.month - 1],
-                  style: const TextStyle(
-                    fontSize: 50,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF5C2A10),
-                    height: 1.0,
-                  ),
-                ),
-              ],
-            ),
+      padding: const EdgeInsets.fromLTRB(4, 12, 4, 0),
+      child: Center(
+        child: Text(
+          '${_focusedDay.year}년 ${_months[_focusedDay.month - 1]}',
+          style: const TextStyle(
+            fontFamily: 'SpaceGrotesk',
+            fontFamilyFallback: ['Pretendard'],
+            fontSize: 30,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFFFFF3E0),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              _NavButton(label: '이전 달', onTap: _goToPrev),
-              const SizedBox(height: 10),
-              _NavButton(label: '다음 달', isAccented: true, onTap: _goToNext),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -275,14 +346,10 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Widget _buildCalendar() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
         color: const Color(0xFFEDE4D4),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFCEC5B4),
-          width: 1,
-        ),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -301,8 +368,9 @@ class _CalendarPageState extends State<CalendarPage> {
           startingDayOfWeek: StartingDayOfWeek.sunday,
           rowHeight: _rowHeight,
           daysOfWeekHeight: _dowHeight,
+          sixWeekMonthsEnforced: true,
           calendarStyle: const CalendarStyle(
-            outsideDaysVisible: false,
+            outsideDaysVisible: true,
             cellMargin: EdgeInsets.zero,
             cellPadding: EdgeInsets.zero,
           ),
@@ -313,6 +381,8 @@ class _CalendarPageState extends State<CalendarPage> {
                 _dayCell(day, isToday: true),
             selectedBuilder: (context, day, _) =>
                 _dayCell(day, isSelected: true),
+            outsideBuilder: (context, day, _) =>
+                _dayCell(day, isOutside: true),
           ),
         ),
       ),
@@ -325,11 +395,10 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Widget _buildInfoPanel() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
         color: const Color(0xFFEDE4D4),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFCEC5B4), width: 1),
       ),
       child: _selectedDay == null ? _panelPlaceholder() : _panelContent(),
     );
@@ -338,7 +407,7 @@ class _CalendarPageState extends State<CalendarPage> {
   Widget _panelPlaceholder() => const Center(
         child: Text(
           '날짜를 선택하면 일정이 표시됩니다',
-          style: TextStyle(color: Color(0xFFAA9898), fontSize: 13),
+          style: TextStyle(fontFamily: 'Pretendard', color: Color(0xFFAA9898), fontSize: 13),
         ),
       );
 
@@ -381,6 +450,8 @@ class _CalendarPageState extends State<CalendarPage> {
                         Text(
                           label,
                           style: const TextStyle(
+                            fontFamily: 'SpaceGrotesk',
+                            fontFamilyFallback: ['Pretendard'],
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF2D2B3A),
@@ -390,6 +461,8 @@ class _CalendarPageState extends State<CalendarPage> {
                         Text(
                           lunarLabel,
                           style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontFamilyFallback: ['Pretendard'],
                             fontSize: 12,
                             color: Color(0xFFB8920A),
                             fontWeight: FontWeight.w500,
@@ -403,6 +476,7 @@ class _CalendarPageState extends State<CalendarPage> {
                         child: Text(
                           specialLabel,
                           style: TextStyle(
+                            fontFamily: 'Pretendard',
                             fontSize: 11,
                             color: specialColor,
                             fontWeight: FontWeight.w600,
@@ -424,6 +498,7 @@ class _CalendarPageState extends State<CalendarPage> {
                   child: const Text(
                     '+ 일정 추가',
                     style: TextStyle(
+                      fontFamily: 'Pretendard',
                       color: Color(0xFF3D1E0A),
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -440,7 +515,7 @@ class _CalendarPageState extends State<CalendarPage> {
               ? const Center(
                   child: Text(
                     '등록된 일정이 없습니다',
-                    style: TextStyle(color: Color(0xFFAA9898), fontSize: 13),
+                    style: TextStyle(fontFamily: 'Pretendard', color: Color(0xFFAA9898), fontSize: 13),
                   ),
                 )
               : ListView.separated(
@@ -449,23 +524,28 @@ class _CalendarPageState extends State<CalendarPage> {
                       const Divider(height: 1, color: Color(0xFFCEC5B4)),
                   itemBuilder: (_, i) {
                     final s = _selectedDaySchedules[i];
-                    return Dismissible(
+                    return Slidable(
                       key: Key('sp_${s.id}'),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFF6B6B),
-                          borderRadius: BorderRadius.only(
-                            bottomRight: Radius.circular(16),
-                            bottomLeft: Radius.circular(16),
+                      endActionPane: ActionPane(
+                        motion: const DrawerMotion(),
+                        extentRatio: 0.4,
+                        children: [
+                          SlidableAction(
+                            onPressed: (_) => _openEditForm(s),
+                            backgroundColor: const Color(0xFF5B8DEF),
+                            foregroundColor: Colors.white,
+                            icon: Icons.edit_outlined,
+                            label: '수정',
                           ),
-                        ),
-                        child: const Icon(Icons.delete_outline,
-                            color: Colors.white),
+                          SlidableAction(
+                            onPressed: (_) => _deleteSchedule(s),
+                            backgroundColor: const Color(0xFFFF6B6B),
+                            foregroundColor: Colors.white,
+                            icon: Icons.delete_outline,
+                            label: '삭제',
+                          ),
+                        ],
                       ),
-                      onDismissed: (_) => _deleteSchedule(s),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 10),
@@ -487,6 +567,7 @@ class _CalendarPageState extends State<CalendarPage> {
                                   Text(
                                     s.title,
                                     style: const TextStyle(
+                                      fontFamily: 'Pretendard',
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,
                                       color: Color(0xFF2D2B3A),
@@ -500,6 +581,7 @@ class _CalendarPageState extends State<CalendarPage> {
                                         if (s.memo != null) s.memo!,
                                       ].join('  ·  '),
                                       style: const TextStyle(
+                                          fontFamily: 'Pretendard',
                                           fontSize: 12,
                                           color: Color(0xFFAA9898)),
                                     ),
@@ -519,6 +601,7 @@ class _CalendarPageState extends State<CalendarPage> {
                                 ),
                                 child: const Text('음력',
                                     style: TextStyle(
+                                        fontFamily: 'Pretendard',
                                         fontSize: 10,
                                         color: Color(0xFFB8920A),
                                         fontWeight: FontWeight.w600)),
@@ -562,8 +645,9 @@ class _CalendarPageState extends State<CalendarPage> {
       child: Text(
         names[day.weekday] ?? '',
         style: TextStyle(
+          fontFamily: 'Pretendard',
           color: isSun
-              ? const Color(0xFF8B7CB8)
+              ? const Color(0xFFE05555)
               : isSat
                   ? const Color(0xFF70A8FF)
                   : const Color(0xFF4A4865),
@@ -577,7 +661,7 @@ class _CalendarPageState extends State<CalendarPage> {
   // ── 날짜 셀 (양력 + 음력/명절 + Dot 마커) ────────────────────────────────────
 
   Widget _dayCell(DateTime day,
-      {bool isSelected = false, bool isToday = false}) {
+      {bool isSelected = false, bool isToday = false, bool isOutside = false}) {
     final isSun = day.weekday == DateTime.sunday;
     final isSat = day.weekday == DateTime.saturday;
     final info = _engine.cellInfo(day);
@@ -589,7 +673,7 @@ class _CalendarPageState extends State<CalendarPage> {
 
     // 날짜 숫자 색상: API 공휴일 / 일요일만 빨강 (음력 전통명절은 제외)
     final Color dayColor = (isPublicHoliday || isSun)
-        ? const Color(0xFF8B7CB8)
+        ? const Color(0xFFE05555)
         : isSat
             ? const Color(0xFF70A8FF)
             : const Color(0xFF2D2B3A);
@@ -603,7 +687,7 @@ class _CalendarPageState extends State<CalendarPage> {
       subColor = isSolarTerm
           ? const Color(0xFF80E080)   // 절기 → 초록
           : const Color(0xFFFFAA88);  // 공휴일 → 주황
-      subFontSize = 13;
+      subFontSize = 13;  // API 공휴일/절기 이름
     } else if (info.holiday != null) {
       subText = info.holiday!;
       subColor = const Color(0xFFFFAA88);
@@ -611,11 +695,13 @@ class _CalendarPageState extends State<CalendarPage> {
     } else {
       subText = info.lunarLabel;
       subColor = info.isSpecial ? const Color(0xFFB8920A) : const Color(0xFFAA9898);
-      subFontSize = 18;
+      subFontSize = 13; // 순수 음력 날짜 (예: '4월 12일')
     }
 
-    return Center(
-      child: Container(
+    return Opacity(
+      opacity: isOutside ? 0.28 : 1.0,
+      child: Center(
+        child: Container(
         width: 52,
         height: _rowHeight - 8,
         decoration: isSelected
@@ -636,6 +722,7 @@ class _CalendarPageState extends State<CalendarPage> {
             Text(
               '${day.day}',
               style: TextStyle(
+                fontFamily: 'SpaceGrotesk',
                 color: dayColor,
                 fontSize: 23, // ← 날짜 숫자 폰트 크기
                 fontWeight: FontWeight.bold,
@@ -643,7 +730,7 @@ class _CalendarPageState extends State<CalendarPage> {
             ),
             // 일정 Dot 마커 — 날짜 숫자 바로 아래 (최대 3개, 고정 높이로 레이아웃 안정)
             SizedBox(
-              height: 3, // ← 날짜 숫자↔음력 텍스트 사이 간격 / 도트 영역 높이
+              height: 10,
               child: scheduleCount > 0
                   ? Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -651,10 +738,10 @@ class _CalendarPageState extends State<CalendarPage> {
                       children: List.generate(
                         scheduleCount.clamp(1, 3),
                         (_) => Container(
-                          width: 5,
-                          height: 5,
+                          width: 7,
+                          height: 7,
                           margin:
-                              const EdgeInsets.symmetric(horizontal: 1.5),
+                              const EdgeInsets.symmetric(horizontal: 2),
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                             color: Color(0xFF8B7CB8),
@@ -668,6 +755,8 @@ class _CalendarPageState extends State<CalendarPage> {
             Text(
               subText,
               style: TextStyle(
+                fontFamily: 'Inter',
+                fontFamilyFallback: const ['Pretendard'],
                 color: subColor,
                 fontSize: subFontSize,
                 fontWeight: (info.isSpecial || info.holiday != null)
@@ -678,44 +767,6 @@ class _CalendarPageState extends State<CalendarPage> {
           ],
         ),
       ),
-    );
-  }
-}
-
-// ── 네비게이션 버튼 ──────────────────────────────────────────────────────────────
-
-class _NavButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  final bool isAccented;
-
-  const _NavButton({
-    required this.label,
-    required this.onTap,
-    this.isAccented = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
-        decoration: BoxDecoration(
-          color: isAccented
-              ? const Color(0xFFE8C090)
-              : const Color(0xFFF2E8D8),
-          borderRadius: BorderRadius.circular(25),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF3D1E0A),
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
-            letterSpacing: 0.8,
-          ),
-        ),
       ),
     );
   }
