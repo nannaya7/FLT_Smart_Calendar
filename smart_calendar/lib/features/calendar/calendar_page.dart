@@ -22,6 +22,7 @@ class CalendarPage extends StatefulWidget {
 class _CalendarPageState extends State<CalendarPage> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
+  int _monthTransitionDirection = 1;
 
   /// 날짜 키("YYYY-MM-DD") → 해당 날짜 일정 수
   Map<String, int> _scheduleCounts = {};
@@ -36,14 +37,38 @@ class _CalendarPageState extends State<CalendarPage> {
   final _googleService = GoogleCalendarService();
   final _apiService = HolidayApiService(); // 24절기 전용
 
-  static const _months = [
-    '1월', '2월', '3월', '4월', '5월', '6월',
-    '7월', '8월', '9월', '10월', '11월', '12월',
+  static const _monthNames = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
 
-  static const _rowHeight = 80.0; // ← 날짜 행 높이
-  static const _dowHeight = 32.0; // ← 요일 헤더 행 높이
+  static const _monthImages = [
+    'image/01_JAN.png',
+    'image/02_FEB.png',
+    'image/03_MAR.png',
+    'image/04_APR.png',
+    'image/05_MAY.png',
+    'image/06_JUN.png',
+    'image/07_JUL.png',
+    'image/08_AUG.png',
+    'image/09_SEP.png',
+    'image/10_OCT.png',
+    'image/11_NOV.png',
+    'image/12_DEC.png',
+  ];
 
+  static const _rowHeight = 66.0; // 날짜 행 높이
+  static const _dowHeight = 38.0; // 요일 헤더 행 높이
 
   // ── 라이프사이클 ────────────────────────────────────────────────────────────
 
@@ -53,6 +78,9 @@ class _CalendarPageState extends State<CalendarPage> {
     _loadSchedules(_focusedDay);
     _loadHolidays(_focusedDay.year);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      for (final path in _monthImages) {
+        await precacheImage(AssetImage(path), context);
+      }
       NotificationService.instance.requestAndroidPermission();
       await _refreshHolidaysIfNeeded();
     });
@@ -155,6 +183,10 @@ class _CalendarPageState extends State<CalendarPage> {
   static int _daysInMonth(int year, int month) =>
       DateTime(year, month + 1, 0).day;
 
+  static int _monthIndex(DateTime d) => d.year * 12 + d.month;
+
+  String get _monthPageKey => '${_focusedDay.year}-${_focusedDay.month}';
+
   /// 반복 일정이 주어진 달(month)에 나타나는 날짜 키 목록 반환
   List<String> _repeatDatesInMonth(Schedule s, DateTime month) {
     final reg = DateTime.parse(s.solarDate);
@@ -189,7 +221,11 @@ class _CalendarPageState extends State<CalendarPage> {
         if (s.isLunar) {
           // 음력 매년: 이 연도의 해당 음력 날짜 → 양력 변환
           if (s.lunarMonth == null || s.lunarDay == null) return [];
-          final solar = _engine.lunarToSolar(month.year, s.lunarMonth!, s.lunarDay!);
+          final solar = _engine.lunarToSolar(
+            month.year,
+            s.lunarMonth!,
+            s.lunarDay!,
+          );
           if (solar == null || solar.month != month.month) return [];
           return [_dateKey(solar)];
         } else {
@@ -240,14 +276,16 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Future<void> _loadSelectedDaySchedules(DateTime day) async {
     // 이 날짜에 등록된 일정 (비반복 + 원래 이 날 등록된 반복 포함)
-    final regular =
-        await DatabaseHelper.instance.getSchedulesByDate(_dateKey(day));
+    final regular = await DatabaseHelper.instance.getSchedulesByDate(
+      _dateKey(day),
+    );
     final regularIds = regular.map((s) => s.id).toSet();
 
     // 모든 반복 일정 중 이 날에 해당하는 것 추가 (중복 제외)
     final allRepeats = await DatabaseHelper.instance.getAllRepeatSchedules();
-    final matching = allRepeats.where((s) =>
-        _isRepeatMatchingDay(s, day) && !regularIds.contains(s.id));
+    final matching = allRepeats.where(
+      (s) => _isRepeatMatchingDay(s, day) && !regularIds.contains(s.id),
+    );
 
     if (!mounted) return;
     setState(() => _selectedDaySchedules = [...regular, ...matching]);
@@ -297,24 +335,60 @@ class _CalendarPageState extends State<CalendarPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF97867B), Color(0xFF807169)],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      backgroundColor: const Color(0xFFF7F8F6),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 360),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          final isIncoming = child.key == ValueKey(_monthPageKey);
+          final direction = _monthTransitionDirection.toDouble();
+          final begin = Offset(isIncoming ? direction : -direction, 0);
+          final offsetAnimation = Tween<Offset>(
+            begin: begin,
+            end: Offset.zero,
+          ).animate(animation);
+
+          return ClipRect(
+            child: SlideTransition(position: offsetAnimation, child: child),
+          );
+        },
+        child: Container(
+          key: ValueKey(_monthPageKey),
+          color: const Color(0xFFF7F8F6),
+          child: Stack(
             children: [
-              _buildHeader(),
-              const SizedBox(height: 4),
-              _buildCalendar(),
-              const SizedBox(height: 6),
-              Expanded(child: _buildInfoPanel()),
-              const SizedBox(height: 6),
+              _buildHeroBackground(),
+              SafeArea(
+                bottom: false,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 44, 20, 18),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildHeader(),
+                              const SizedBox(height: 14),
+                              _buildCalendar(),
+                              const SizedBox(height: 12),
+                              _buildInfoPanel(),
+                              const SizedBox(height: 22),
+                              _buildFooter(),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ],
           ),
         ),
@@ -325,17 +399,86 @@ class _CalendarPageState extends State<CalendarPage> {
   // ── 헤더 ────────────────────────────────────────────────────────────────────
 
   Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 12, 4, 0),
-      child: Center(
-        child: Text(
-          '${_focusedDay.year}년 ${_months[_focusedDay.month - 1]}',
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          '${_focusedDay.month}',
           style: const TextStyle(
-            fontFamily: 'SpaceGrotesk',
-            fontFamilyFallback: ['Pretendard'],
-            fontSize: 30,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFFFFF3E0),
+            fontFamily: 'Pretendard',
+            fontSize: 72,
+            height: 0.86,
+            fontWeight: FontWeight.w400,
+            color: Color(0xFF2F3135),
+          ),
+        ),
+        const Spacer(),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${_focusedDay.year}',
+                style: const TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF4D535B),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _monthNames[_focusedDay.month - 1],
+                style: const TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: 33,
+                  height: 1.0,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF2F3135),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeroBackground() {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 330,
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(36)),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFFEAF3F8),
+            image: DecorationImage(
+              image: AssetImage(_monthImages[_focusedDay.month - 1]),
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+              colorFilter: const ColorFilter.mode(
+                Color(0x1AFFFFFF),
+                BlendMode.screen,
+              ),
+            ),
+          ),
+          child: const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0x1AF2FAFF),
+                  Color(0x14F7FBFF),
+                  Color(0x08FFFFFF),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -346,10 +489,16 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Widget _buildCalendar() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFEDE4D4),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -360,7 +509,12 @@ class _CalendarPageState extends State<CalendarPage> {
           selectedDayPredicate: (d) => isSameDay(_selectedDay, d),
           onDaySelected: _onDayTap,
           onPageChanged: (focused) {
-            setState(() => _focusedDay = focused);
+            final previousIndex = _monthIndex(_focusedDay);
+            final nextIndex = _monthIndex(focused);
+            setState(() {
+              _monthTransitionDirection = nextIndex >= previousIndex ? 1 : -1;
+              _focusedDay = focused;
+            });
             _loadSchedules(focused);
             _loadHolidays(focused.year);
           },
@@ -377,12 +531,10 @@ class _CalendarPageState extends State<CalendarPage> {
           calendarBuilders: CalendarBuilders(
             dowBuilder: (context, day) => _dowCell(day),
             defaultBuilder: (context, day, _) => _dayCell(day),
-            todayBuilder: (context, day, _) =>
-                _dayCell(day, isToday: true),
+            todayBuilder: (context, day, _) => _dayCell(day, isToday: true),
             selectedBuilder: (context, day, _) =>
                 _dayCell(day, isSelected: true),
-            outsideBuilder: (context, day, _) =>
-                _dayCell(day, isOutside: true),
+            outsideBuilder: (context, day, _) => _dayCell(day, isOutside: true),
           ),
         ),
       ),
@@ -395,21 +547,32 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Widget _buildInfoPanel() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
+      height: 152,
       decoration: BoxDecoration(
-        color: const Color(0xFFEDE4D4),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: _selectedDay == null ? _panelPlaceholder() : _panelContent(),
     );
   }
 
   Widget _panelPlaceholder() => const Center(
-        child: Text(
-          '날짜를 선택하면 일정이 표시됩니다',
-          style: TextStyle(fontFamily: 'Pretendard', color: Color(0xFFAA9898), fontSize: 13),
-        ),
-      );
+    child: Text(
+      '날짜를 선택하면 일정이 표시됩니다',
+      style: TextStyle(
+        fontFamily: 'Pretendard',
+        color: Color(0xFF8A8F98),
+        fontSize: 13,
+      ),
+    ),
+  );
 
   Widget _panelContent() {
     final d = _selectedDay!;
@@ -438,7 +601,7 @@ class _CalendarPageState extends State<CalendarPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 8, 6),
+          padding: const EdgeInsets.fromLTRB(18, 12, 12, 8),
           child: Row(
             children: [
               Expanded(
@@ -452,9 +615,9 @@ class _CalendarPageState extends State<CalendarPage> {
                           style: const TextStyle(
                             fontFamily: 'SpaceGrotesk',
                             fontFamilyFallback: ['Pretendard'],
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2D2B3A),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF3E4248),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -463,8 +626,8 @@ class _CalendarPageState extends State<CalendarPage> {
                           style: const TextStyle(
                             fontFamily: 'Inter',
                             fontFamilyFallback: ['Pretendard'],
-                            fontSize: 12,
-                            color: Color(0xFFB8920A),
+                            fontSize: 11,
+                            color: Color(0xFF7A818C),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -489,17 +652,19 @@ class _CalendarPageState extends State<CalendarPage> {
               GestureDetector(
                 onTap: _openAddForm,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8C090),
+                    color: const Color(0xFFF1F4F8),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Text(
                     '+ 일정 추가',
                     style: TextStyle(
                       fontFamily: 'Pretendard',
-                      color: Color(0xFF3D1E0A),
+                      color: Color(0xFF3C74D9),
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -509,19 +674,24 @@ class _CalendarPageState extends State<CalendarPage> {
             ],
           ),
         ),
-        const Divider(height: 1, color: Color(0xFFCEC5B4)),
+        const Divider(height: 1, color: Color(0xFFEAECEF)),
         Expanded(
           child: _selectedDaySchedules.isEmpty
               ? const Center(
                   child: Text(
                     '등록된 일정이 없습니다',
-                    style: TextStyle(fontFamily: 'Pretendard', color: Color(0xFFAA9898), fontSize: 13),
+                    style: TextStyle(
+                      fontFamily: 'Pretendard',
+                      color: Color(0xFF8A8F98),
+                      fontSize: 13,
+                    ),
                   ),
                 )
               : ListView.separated(
+                  padding: EdgeInsets.zero,
                   itemCount: _selectedDaySchedules.length,
                   separatorBuilder: (_, _) =>
-                      const Divider(height: 1, color: Color(0xFFCEC5B4)),
+                      const Divider(height: 1, color: Color(0xFFEAECEF)),
                   itemBuilder: (_, i) {
                     final s = _selectedDaySchedules[i];
                     return Slidable(
@@ -548,18 +718,20 @@ class _CalendarPageState extends State<CalendarPage> {
                       ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
+                          horizontal: 18,
+                          vertical: 10,
+                        ),
                         child: Row(
                           children: [
                             Container(
-                              width: 4,
-                              height: 32,
+                              width: 9,
+                              height: 9,
                               decoration: BoxDecoration(
                                 color: Color(s.categoryColor),
-                                borderRadius: BorderRadius.circular(2),
+                                shape: BoxShape.circle,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 16),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -568,9 +740,9 @@ class _CalendarPageState extends State<CalendarPage> {
                                     s.title,
                                     style: const TextStyle(
                                       fontFamily: 'Pretendard',
-                                      fontSize: 14,
+                                      fontSize: 13,
                                       fontWeight: FontWeight.w500,
-                                      color: Color(0xFF2D2B3A),
+                                      color: Color(0xFF33373D),
                                     ),
                                   ),
                                   if (s.time != null || s.memo != null) ...[
@@ -581,9 +753,10 @@ class _CalendarPageState extends State<CalendarPage> {
                                         if (s.memo != null) s.memo!,
                                       ].join('  ·  '),
                                       style: const TextStyle(
-                                          fontFamily: 'Pretendard',
-                                          fontSize: 12,
-                                          color: Color(0xFFAA9898)),
+                                        fontFamily: 'Pretendard',
+                                        fontSize: 11,
+                                        color: Color(0xFF747B86),
+                                      ),
                                     ),
                                   ],
                                 ],
@@ -593,30 +766,42 @@ class _CalendarPageState extends State<CalendarPage> {
                               Container(
                                 margin: const EdgeInsets.only(left: 4),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 5, vertical: 1),
+                                  horizontal: 5,
+                                  vertical: 1,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFB8920A)
-                                      .withValues(alpha: 0.15),
+                                  color: const Color(
+                                    0xFFB8920A,
+                                  ).withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
-                                child: const Text('음력',
-                                    style: TextStyle(
-                                        fontFamily: 'Pretendard',
-                                        fontSize: 10,
-                                        color: Color(0xFFB8920A),
-                                        fontWeight: FontWeight.w600)),
+                                child: const Text(
+                                  '음력',
+                                  style: TextStyle(
+                                    fontFamily: 'Pretendard',
+                                    fontSize: 10,
+                                    color: Color(0xFFB8920A),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             if (s.repeatType != null)
                               const Padding(
                                 padding: EdgeInsets.only(left: 4),
-                                child: Icon(Icons.repeat,
-                                    color: Color(0xFF8B7CB8), size: 15),
+                                child: Icon(
+                                  Icons.repeat,
+                                  color: Color(0xFF8B7CB8),
+                                  size: 15,
+                                ),
                               ),
                             if (s.alarmMinutesBefore != null)
                               const Padding(
                                 padding: EdgeInsets.only(left: 4),
-                                child: Icon(Icons.notifications_outlined,
-                                    color: Color(0xFFAA9898), size: 16),
+                                child: Icon(
+                                  Icons.notifications_outlined,
+                                  color: Color(0xFFAA9898),
+                                  size: 16,
+                                ),
                               ),
                           ],
                         ),
@@ -633,25 +818,30 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Widget _dowCell(DateTime day) {
     const names = {
-      1: '월', 2: '화', 3: '수',
-      4: '목', 5: '금', 6: '토', 7: '일',
+      1: 'MON',
+      2: 'TUE',
+      3: 'WED',
+      4: 'THU',
+      5: 'FRI',
+      6: 'SAT',
+      7: 'SUN',
     };
     final isSun = day.weekday == DateTime.sunday;
     final isSat = day.weekday == DateTime.saturday;
     return Container(
-      color: const Color(0xFFDDD4C4),
+      color: Colors.white,
       alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 7),
       child: Text(
         names[day.weekday] ?? '',
         style: TextStyle(
           fontFamily: 'Pretendard',
           color: isSun
-              ? const Color(0xFFE05555)
+              ? const Color(0xFFFF3B30)
               : isSat
-                  ? const Color(0xFF70A8FF)
-                  : const Color(0xFF4A4865),
-          fontSize: 12,
+              ? const Color(0xFF2E73D8)
+              : const Color(0xFF50545C),
+          fontSize: 9.5,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -660,8 +850,12 @@ class _CalendarPageState extends State<CalendarPage> {
 
   // ── 날짜 셀 (양력 + 음력/명절 + Dot 마커) ────────────────────────────────────
 
-  Widget _dayCell(DateTime day,
-      {bool isSelected = false, bool isToday = false, bool isOutside = false}) {
+  Widget _dayCell(
+    DateTime day, {
+    bool isSelected = false,
+    bool isToday = false,
+    bool isOutside = false,
+  }) {
     final isSun = day.weekday == DateTime.sunday;
     final isSat = day.weekday == DateTime.saturday;
     final info = _engine.cellInfo(day);
@@ -673,10 +867,10 @@ class _CalendarPageState extends State<CalendarPage> {
 
     // 날짜 숫자 색상: API 공휴일 / 일요일만 빨강 (음력 전통명절은 제외)
     final Color dayColor = (isPublicHoliday || isSun)
-        ? const Color(0xFFE05555)
+        ? const Color(0xFFFF3B30)
         : isSat
-            ? const Color(0xFF70A8FF)
-            : const Color(0xFF2D2B3A);
+        ? const Color(0xFF2E73D8)
+        : const Color(0xFF2F3135);
 
     // 하단 텍스트: API 데이터 우선 → 음력명절 → 음력날짜
     final String subText;
@@ -685,88 +879,102 @@ class _CalendarPageState extends State<CalendarPage> {
     if (apiEntry != null) {
       subText = apiEntry.name;
       subColor = isSolarTerm
-          ? const Color(0xFF80E080)   // 절기 → 초록
-          : const Color(0xFFFFAA88);  // 공휴일 → 주황
-      subFontSize = 13;  // API 공휴일/절기 이름
+          ? const Color(0xFF4FA96A)
+          : const Color(0xFFFF6E4A);
+      subFontSize = 8.5;
     } else if (info.holiday != null) {
       subText = info.holiday!;
-      subColor = const Color(0xFFFFAA88);
-      subFontSize = 13;
+      subColor = const Color(0xFFFF6E4A);
+      subFontSize = 8.5;
     } else {
       subText = info.lunarLabel;
-      subColor = info.isSpecial ? const Color(0xFFB8920A) : const Color(0xFFAA9898);
-      subFontSize = 13; // 순수 음력 날짜 (예: '4월 12일')
+      subColor = info.isSpecial
+          ? const Color(0xFFB8920A)
+          : const Color(0xFF656B75);
+      subFontSize = 13;
     }
 
     return Opacity(
       opacity: isOutside ? 0.28 : 1.0,
       child: Center(
         child: Container(
-        width: 52,
-        height: _rowHeight - 8,
-        decoration: isSelected
-            ? BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey, width: 1.5),
-              )
-            : isToday
-                ? BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    color: const Color(0xFF8B7CB8).withValues(alpha: 0.18),
-                  )
-                : null,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // 양력 날짜
-            Text(
-              '${day.day}',
-              style: TextStyle(
-                fontFamily: 'SpaceGrotesk',
-                color: dayColor,
-                fontSize: 23, // ← 날짜 숫자 폰트 크기
-                fontWeight: FontWeight.bold,
+          width: 43,
+          height: _rowHeight - 4,
+          decoration: isSelected
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFFEDEFF5),
+                )
+              : isToday
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFFEAF2FF),
+                )
+              : null,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // 양력 날짜 폰트 조절: fontFamily, fontSize, fontWeight 수정
+              Text(
+                '${day.day}',
+                style: TextStyle(
+                  fontFamily: 'SpaceGrotesk',
+                  color: dayColor,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-            // 일정 Dot 마커 — 날짜 숫자 바로 아래 (최대 3개, 고정 높이로 레이아웃 안정)
-            SizedBox(
-              height: 10,
-              child: scheduleCount > 0
-                  ? Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: List.generate(
-                        scheduleCount.clamp(1, 3),
-                        (_) => Container(
-                          width: 7,
-                          height: 7,
-                          margin:
-                              const EdgeInsets.symmetric(horizontal: 2),
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Color(0xFF8B7CB8),
+              // 일정 Dot 마커 — 날짜 숫자 바로 아래 (최대 3개, 고정 높이로 레이아웃 안정)
+              SizedBox(
+                height: 7,
+                child: scheduleCount > 0
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(
+                          scheduleCount.clamp(1, 3),
+                          (_) => Container(
+                            width: 5,
+                            height: 6,
+                            margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFF3678CF),
+                            ),
                           ),
                         ),
-                      ),
-                    )
-                  : null,
-            ),
-            // 음력 날짜 또는 명절 이름
-            Text(
-              subText,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontFamilyFallback: const ['Pretendard'],
-                color: subColor,
-                fontSize: subFontSize,
-                fontWeight: (info.isSpecial || info.holiday != null)
-                    ? FontWeight.w600
-                    : FontWeight.normal,
+                      )
+                    : null,
               ),
-            ),
-          ],
+              // 음력 날짜 폰트 조절: subFontSize와 아래 TextStyle 수정
+              Text(
+                subText,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontFamilyFallback: const ['Pretendard'],
+                  color: subColor,
+                  fontSize: subFontSize,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildFooter() {
+    return const Center(
+      child: Text(
+        '오늘도 당신의 하루를 응원합니다',
+        style: TextStyle(
+          fontFamily: 'Pretendard',
+          fontSize: 12,
+          color: Color(0xFF8A8F98),
+        ),
       ),
     );
   }

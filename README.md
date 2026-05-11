@@ -10,11 +10,14 @@
 
 ### 하이브리드 달력
 
-- 양력 날짜 메인 표시 + 음력 날짜(월·일) 작게 병기
+- 월별 배경 이미지 히어로 + 흰색 카드형 달력 UI
+- 상단에 큰 월 숫자, 연도, 영문 월명 표시
+- 양력 날짜 메인 표시 + 음력 날짜(월·일) 병기
 - 음력 1일·15일 및 주요 명절 강조 표시
 - 한국 공휴일(대체 공휴일 포함) 자동 연동 — 빨간색
 - 24절기(입춘·경칩 등) 해당 날짜 표시 — 초록색
 - 전통 음력 명절(단오·추석 등) 서브텍스트 표시 — 주황색
+- 월 전환 시 이전/다음 방향에 맞춘 좌우 슬라이드 애니메이션
 
 ### 색상 규칙
 
@@ -25,14 +28,21 @@
 | 24절기 | Green `#80E080` |
 | 음력 명절·특일 서브텍스트 | Orange `#FFAA88` |
 | 평일 | White |
+| 선택 날짜 | Light Blue 계열 배경 |
 
 ### 일정 관리 (CRUD)
 
-- 날짜 탭 → 하단 인라인 패널에서 일정 목록 확인 및 추가
+- 날짜 탭 → 하단 인라인 패널에서 일정 목록 확인 및 추가/수정
 - 패널 헤더에 양력·음력 날짜 동시 표기, 절기·명절 서브텍스트 표시
 - 일정 항목: 제목, 메모, 시간, 알림 설정, 반복 유형, 양력/음력 구분
-- 스와이프(→←)로 일정 삭제
+- 스와이프 액션으로 일정 수정 및 삭제
 - 일정 있는 날짜에 Dot 마커 표시 (최대 3개)
+
+### 화면 표시 안정화
+
+- iOS 기기별 텍스트 크기 설정 차이를 줄이기 위해 앱 전체에 `TextScaler.noScaling` 적용
+- iPhone / iPhone Pro Max 화면에서 날짜 셀 폰트, 간격, 잘림 여부를 비교하며 조정
+- 날짜 셀 안의 양력/음력 폰트 조절 위치에 코드 주석 추가
 
 ### 반복 일정
 
@@ -61,25 +71,28 @@
 | HTTP Client | http | ^1.2.0 |
 | Notifications | flutter_local_notifications | ^18.0.0 |
 | Timezone | timezone | ^0.9.4 |
-| External API | 공공데이터포털 한국천문연구원 특일 정보 API | — |
+| External API | 공공데이터포털 한국천문연구원 특일 정보 API | API 키 발급 전 |
 
 ---
 
 ## 프로젝트 구조
+
+현행 설계서는 [`doc/current_design.md`](doc/current_design.md)를 참고합니다.
 
 ```
 lib/
   core/
     calendar_engine.dart          # 음력 변환 및 명절 판별 (CalendarEngine)
     api/
-      holiday_api_service.dart    # 공공데이터포털 API 래퍼
+      holiday_api_service.dart    # 공공데이터포털 특일 정보 API 래퍼
+      google_calendar_service.dart # 이전 검토용 공휴일 API 래퍼 (향후 제거/미사용 예정)
     db/
       database_helper.dart        # sqflite CRUD (schedules + holidays)
     notifications/
       notification_service.dart   # 알림 초기화 및 스케줄링
   features/
     calendar/
-      calendar_page.dart          # 메인 달력 UI + 인라인 일정 패널
+      calendar_page.dart          # 월별 이미지 달력 UI + 인라인 일정 패널 + 월 전환 애니메이션
     schedule/
       schedule_form_sheet.dart    # 일정 등록 BottomSheet
   shared/
@@ -120,20 +133,31 @@ CREATE TABLE holidays (
 
 ## 실행 방법
 
-API 키는 소스에 하드코딩하지 않고 `--dart-define`으로 주입합니다.
+공휴일과 24절기는 공공데이터포털 한국천문연구원 특일 정보 API 기준으로 진행합니다.
+API 키는 아직 발급 전이며, 발급 후에도 소스에 하드코딩하지 않고 `--dart-define`으로 주입합니다.
 
 ```bash
 flutter run --dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>
 ```
 
-API 키 없이 실행하면 공휴일·절기 API 호출을 건너뛰고 음력 데이터만 표시됩니다.
+현재처럼 API 키 없이 실행하면 공휴일·절기 API 호출을 건너뛰고 음력 데이터와 로컬 일정 기능만 표시됩니다.
+
+### 공공데이터포털 진행 메모
+
+- 대상 API: 공공데이터포털 `특일 정보 조회 서비스`
+- 제공 기관: 한국천문연구원
+- 사용 예정 데이터: 법정 공휴일, 대체 공휴일, 24절기
+- 캐싱 방식: 연도별 조회 후 `holidays` 테이블에 저장
+- 현재 상태: API 키 미발급, 키 발급 후 `HOLIDAY_API_KEY`로 연결 예정
 
 ---
 
 ## 향후 계획
 
-- 일정 편집 기능 (현재 추가·삭제만 지원)
+- 공휴일 데이터 소스를 공공데이터포털로 일원화
+- API 키 발급 후 공휴일·24절기 연동 검증
+- 사용하지 않는 Google Calendar 공휴일 연동 코드 정리
 - Riverpod 상태 관리 적용
 - 라이트/다크 테마 전환 (`shared/theme/`)
 - 홈 화면 위젯 (오늘 일정 & 음력 날짜)
-- 구글·애플 캘린더 동기화
+- 외부 캘린더 동기화
