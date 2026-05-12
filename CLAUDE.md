@@ -12,7 +12,7 @@ Flutter 기반 양력/음력 하이브리드 달력 앱. 한국 공휴일·24절
 - **Notifications**: `flutter_local_notifications` (Android / iOS 권한 포함)
 - **Lunar conversion**: `korean_lunar_utils`
 - **External API**: 공공데이터포털 한국천문연구원 특일 정보 API → DB 캐싱 후 사용
-- **API Key Status**: 공공데이터포털 API 키 미발급. 키가 없으면 공휴일·절기 연동 없이 앱이 동작해야 함
+- **API Key Status**: `--dart-define=HOLIDAY_API_KEY=...` 우선. 빌드타임 키가 없으면 앱 내부 입력창에서 `SharedPreferences`에 저장. 키가 없으면 특일 연동 없이 앱이 동작해야 함
 - **Text Scaling**: 기기별 텍스트 크기 차이를 줄이기 위해 `TextScaler.noScaling` 적용
 
 ## 디렉터리 구조
@@ -60,10 +60,12 @@ lib/
 ## 주요 주의사항
 
 - 앞으로 공휴일·24절기 데이터 소스는 공공데이터포털로 일원화한다
-- 공공데이터포털 API 키는 아직 미발급 상태다
 - API 키는 `--dart-define=HOLIDAY_API_KEY=...`로 주입하고, 소스에 하드코딩 금지
+- 빌드타임 키가 없을 때만 앱 내부 입력창에서 입력받는다
 - API 키가 없을 때도 앱은 음력 표시와 로컬 일정 기능으로 정상 동작해야 한다
-- 공휴일·절기 데이터는 연도별로 API 호출 후 sqflite에 캐싱, 앱 재시작 시 캐시 우선 사용
+- 기념일, 공휴일, 국경일, 24절기은 모두 공공데이터포털 특일 정보 API에서 가져온다
+- 특일 데이터는 연도별로 API 호출 후 sqflite에 캐싱, 앱 재시작 시 캐시 우선 사용
+- 인증키가 포함된 로컬 파일(`doc/openapi.txt`)은 커밋하지 않는다
 - `flutter_local_notifications` Android 설정 시 `AndroidManifest.xml` 권한(`SCHEDULE_EXACT_ALARM`) 반드시 포함
 - iOS 알림은 `UNUserNotificationCenter` 권한 요청 흐름 포함
 - 양/음력 텍스트 겹침 방지: 날짜 셀은 `Column` 구조 사용 (Stack 사용 시 overflow 주의)

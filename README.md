@@ -17,6 +17,7 @@
 - 한국 공휴일(대체 공휴일 포함) 자동 연동 — 빨간색
 - 24절기(입춘·경칩 등) 해당 날짜 표시 — 초록색
 - 전통 음력 명절(단오·추석 등) 서브텍스트 표시 — 주황색
+- 기념일은 달력 셀에는 숨기고 선택 날짜 정보창에서만 표시
 - 월 전환 시 이전/다음 방향에 맞춘 좌우 슬라이드 애니메이션
 
 ### 색상 규칙
@@ -71,7 +72,7 @@
 | HTTP Client | http | ^1.2.0 |
 | Notifications | flutter_local_notifications | ^18.0.0 |
 | Timezone | timezone | ^0.9.4 |
-| External API | 공공데이터포털 한국천문연구원 특일 정보 API | API 키 발급 전 |
+| External API | 공공데이터포털 한국천문연구원 특일 정보 API | `HOLIDAY_API_KEY` |
 
 ---
 
@@ -125,7 +126,7 @@ CREATE TABLE holidays (
     id    INTEGER PRIMARY KEY AUTOINCREMENT,
     date  TEXT NOT NULL,  -- YYYY-MM-DD
     name  TEXT NOT NULL,
-    type  TEXT NOT NULL   -- 'holiday' | 'solar_term'
+    type  TEXT NOT NULL   -- anniversary | rest_day | national_holiday | solar_term
 );
 ```
 
@@ -134,29 +135,33 @@ CREATE TABLE holidays (
 ## 실행 방법
 
 공휴일과 24절기는 공공데이터포털 한국천문연구원 특일 정보 API 기준으로 진행합니다.
-API 키는 아직 발급 전이며, 발급 후에도 소스에 하드코딩하지 않고 `--dart-define`으로 주입합니다.
+API 키는 소스에 하드코딩하지 않습니다. 빌드 또는 실행 시 `--dart-define=HOLIDAY_API_KEY=...`로 공공데이터포털 일반 인증키를 주입합니다.
 
 ```bash
 flutter run --dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>
+flutter build ios --dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>
+flutter build apk --dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>
 ```
 
-현재처럼 API 키 없이 실행하면 공휴일·절기 API 호출을 건너뛰고 음력 데이터와 로컬 일정 기능만 표시됩니다.
+빌드타임 키가 없으면 앱 최초 실행 시 입력창에서 키를 등록할 수 있습니다.
+
+API 키 없이 실행하면 특일 API 호출을 건너뛰고 음력 데이터와 로컬 일정 기능만 표시됩니다.
 
 ### 공공데이터포털 진행 메모
 
 - 대상 API: 공공데이터포털 `특일 정보 조회 서비스`
 - 제공 기관: 한국천문연구원
-- 사용 예정 데이터: 법정 공휴일, 대체 공휴일, 24절기
+- 사용 데이터: 기념일, 공휴일, 국경일, 24절기
+- 조회 엔드포인트: `getAnniversaryInfo`, `getRestDeInfo`, `getHoliDeInfo`, `get24DivisionsInfo`
 - 캐싱 방식: 연도별 조회 후 `holidays` 테이블에 저장
-- 현재 상태: API 키 미발급, 키 발급 후 `HOLIDAY_API_KEY`로 연결 예정
+- API 키 등록: `--dart-define=HOLIDAY_API_KEY=...` 우선, 앱 내부 입력은 보조 방식
 
 ---
 
 ## 향후 계획
 
 - 공휴일 데이터 소스를 공공데이터포털로 일원화
-- API 키 발급 후 공휴일·24절기 연동 검증
-- 사용하지 않는 Google Calendar 공휴일 연동 코드 정리
+- 실제 API 응답 기준 특일 표시 우선순위 검증
 - Riverpod 상태 관리 적용
 - 라이트/다크 테마 전환 (`shared/theme/`)
 - 홈 화면 위젯 (오늘 일정 & 음력 날짜)

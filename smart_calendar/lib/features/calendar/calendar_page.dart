@@ -1,10 +1,11 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../core/calendar_engine.dart';
-import '../../core/api/google_calendar_service.dart';
 import '../../core/api/holiday_api_service.dart';
 import '../../core/db/database_helper.dart';
 import '../../core/notifications/notification_service.dart';
@@ -23,19 +24,22 @@ class _CalendarPageState extends State<CalendarPage> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   int _monthTransitionDirection = 1;
+  bool _apiKeyPromptShown = false;
 
   /// 날짜 키("YYYY-MM-DD") → 해당 날짜 일정 수
   Map<String, int> _scheduleCounts = {};
 
   List<Schedule> _selectedDaySchedules = [];
 
-  /// 날짜 키("YYYY-MM-DD") → 공휴일 or 절기 정보
+  /// 날짜 키("YYYY-MM-DD") → 하단 정보창에 표시할 특일 정보
   final Map<String, Holiday> _holidays = {};
+
+  /// 날짜 키("YYYY-MM-DD") → 달력 셀에 표시할 특일 정보 (기념일 제외)
+  final Map<String, Holiday> _calendarHolidays = {};
   final Set<int> _loadedHolidayYears = {};
 
   final _engine = CalendarEngine.instance;
-  final _googleService = GoogleCalendarService();
-  final _apiService = HolidayApiService(); // 24절기 전용
+  final _apiService = HolidayApiService();
 
   static const _monthNames = [
     'January',
@@ -82,12 +86,17 @@ class _CalendarPageState extends State<CalendarPage> {
         await precacheImage(AssetImage(path), context);
       }
       NotificationService.instance.requestAndroidPermission();
+      if (!_apiService.hasBuildTimeApiKey) {
+        await _ensureHolidayApiKey();
+      }
       await _refreshHolidaysIfNeeded();
     });
   }
 
   /// 최초 설치 또는 월말일에 공휴일 데이터를 갱신한다.
   Future<void> _refreshHolidaysIfNeeded() async {
+    if (!await _apiService.hasApiKey()) return;
+
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
 
@@ -114,6 +123,58 @@ class _CalendarPageState extends State<CalendarPage> {
     await prefs.setBool(refreshKey, true);
   }
 
+  Future<void> _ensureHolidayApiKey() async {
+    if (_apiKeyPromptShown || await _apiService.hasApiKey()) return;
+    if (!mounted) return;
+
+    _apiKeyPromptShown = true;
+    final apiKey = await _showApiKeyDialog();
+    if (apiKey == null || apiKey.isEmpty) return;
+
+    await _apiService.saveApiKey(apiKey);
+    final now = DateTime.now();
+    await Future.wait([
+      _loadHolidays(now.year, forceRefresh: true),
+      _loadHolidays(now.year + 1, forceRefresh: true),
+    ]);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('holiday_initialized', true);
+  }
+
+  Future<String?> _showApiKeyDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('특일 API 키 입력'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: '공공데이터포털 일반 인증키'),
+            minLines: 1,
+            maxLines: 3,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('나중에'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop(controller.text.trim());
+              },
+              child: const Text('저장'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    return result;
+  }
+
   Future<void> _loadHolidays(int year, {bool forceRefresh = false}) async {
     if (!forceRefresh && _loadedHolidayYears.contains(year)) return;
 
@@ -126,12 +187,7 @@ class _CalendarPageState extends State<CalendarPage> {
     List<Holiday> all;
 
     if (cached.isEmpty) {
-      // 공휴일: Google Calendar / 24절기: 공공데이터포털
-      final results = await Future.wait([
-        _googleService.fetchHolidays(year),
-        _apiService.fetchSolarTerms(year),
-      ]);
-      all = [...results[0], ...results[1]];
+      all = await _apiService.fetchAllSpecialDays(year);
       if (all.isNotEmpty) {
         await DatabaseHelper.instance.insertHolidays(all);
       }
@@ -141,8 +197,13 @@ class _CalendarPageState extends State<CalendarPage> {
 
     if (!mounted) return;
     setState(() {
+      _holidays.removeWhere((date, _) => date.startsWith('$year-'));
+      _calendarHolidays.removeWhere((date, _) => date.startsWith('$year-'));
       for (final h in all) {
-        _holidays[h.date] = h;
+        _putPriorityHoliday(_holidays, h);
+        if (!_isAnniversaryType(h.type)) {
+          _putPriorityHoliday(_calendarHolidays, h);
+        }
       }
       _loadedHolidayYears.add(year);
     });
@@ -186,6 +247,42 @@ class _CalendarPageState extends State<CalendarPage> {
   static int _monthIndex(DateTime d) => d.year * 12 + d.month;
 
   String get _monthPageKey => '${_focusedDay.year}-${_focusedDay.month}';
+
+  static int _holidayPriority(String type) {
+    switch (type) {
+      case 'rest_day':
+        return 50;
+      case 'solar_term':
+        return 40;
+      case 'national_holiday':
+        return 35;
+      case 'anniversary':
+        return 20;
+      default:
+        return 0;
+    }
+  }
+
+  static bool _isPublicHolidayType(String type) => type == 'rest_day';
+
+  static bool _isAnniversaryType(String type) => type == 'anniversary';
+
+  static void _putPriorityHoliday(
+    Map<String, Holiday> target,
+    Holiday holiday,
+  ) {
+    final existing = target[holiday.date];
+    if (existing == null ||
+        _holidayPriority(holiday.type) > _holidayPriority(existing.type)) {
+      target[holiday.date] = holiday;
+    }
+  }
+
+  static Color _apiSpecialDayColor(String type) {
+    return _isPublicHolidayType(type)
+        ? const Color(0xFFFF6E4A)
+        : const Color(0xFF4FA96A);
+  }
 
   /// 반복 일정이 주어진 달(month)에 나타나는 날짜 키 목록 반환
   List<String> _repeatDatesInMonth(Schedule s, DateTime month) {
@@ -402,47 +499,70 @@ class _CalendarPageState extends State<CalendarPage> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text(
-          '${_focusedDay.month}',
-          style: const TextStyle(
-            fontFamily: 'Pretendard',
-            fontSize: 72,
-            height: 0.86,
-            fontWeight: FontWeight.w400,
-            color: Color(0xFF2F3135),
+        _headerBlur(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          child: Text(
+            '${_focusedDay.month}',
+            style: const TextStyle(
+              fontFamily: 'Pretendard',
+              fontSize: 72,
+              height: 0.86,
+              fontWeight: FontWeight.w400,
+              color: Color(0xFF2F3135),
+            ),
           ),
         ),
         const Spacer(),
         Padding(
           padding: const EdgeInsets.only(bottom: 2),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '${_focusedDay.year}',
-                style: const TextStyle(
-                  fontFamily: 'Pretendard',
-                  fontSize: 22,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF4D535B),
+          child: _headerBlur(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${_focusedDay.year}',
+                  style: const TextStyle(
+                    fontFamily: 'Pretendard',
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF4D535B),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                _monthNames[_focusedDay.month - 1],
-                style: const TextStyle(
-                  fontFamily: 'Pretendard',
-                  fontSize: 33,
-                  height: 1.0,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF2F3135),
+                const SizedBox(height: 6),
+                Text(
+                  _monthNames[_focusedDay.month - 1],
+                  style: const TextStyle(
+                    fontFamily: 'Pretendard',
+                    fontSize: 33,
+                    height: 1.0,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF2F3135),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _headerBlur({
+    required Widget child,
+    required EdgeInsetsGeometry padding,
+  }) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          padding: padding,
+          color: Colors.white.withValues(alpha: 0.5),
+          child: child,
+        ),
+      ),
     );
   }
 
@@ -589,9 +709,7 @@ class _CalendarPageState extends State<CalendarPage> {
     Color specialColor = const Color(0xFF80E080);
     if (apiEntry != null) {
       specialLabel = apiEntry.name;
-      specialColor = apiEntry.type == 'solar_term'
-          ? const Color(0xFF4CAF50)
-          : const Color(0xFFFF8A65);
+      specialColor = _apiSpecialDayColor(apiEntry.type);
     } else if (cellInfo.holiday != null) {
       specialLabel = cellInfo.holiday;
       specialColor = const Color(0xFFFF8A65);
@@ -860,10 +978,10 @@ class _CalendarPageState extends State<CalendarPage> {
     final isSat = day.weekday == DateTime.saturday;
     final info = _engine.cellInfo(day);
     final scheduleCount = _scheduleCounts[_dateKey(day)] ?? 0;
-    final apiEntry = _holidays[_dateKey(day)];
+    final apiEntry = _calendarHolidays[_dateKey(day)];
 
-    final bool isPublicHoliday = apiEntry?.type == 'holiday';
-    final bool isSolarTerm = apiEntry?.type == 'solar_term';
+    final bool isPublicHoliday =
+        apiEntry != null && _isPublicHolidayType(apiEntry.type);
 
     // 날짜 숫자 색상: API 공휴일 / 일요일만 빨강 (음력 전통명절은 제외)
     final Color dayColor = (isPublicHoliday || isSun)
@@ -878,14 +996,12 @@ class _CalendarPageState extends State<CalendarPage> {
     final double subFontSize;
     if (apiEntry != null) {
       subText = apiEntry.name;
-      subColor = isSolarTerm
-          ? const Color(0xFF4FA96A)
-          : const Color(0xFFFF6E4A);
-      subFontSize = 8.5;
+      subColor = _apiSpecialDayColor(apiEntry.type);
+      subFontSize = 13;
     } else if (info.holiday != null) {
       subText = info.holiday!;
       subColor = const Color(0xFFFF6E4A);
-      subFontSize = 8.5;
+      subFontSize = 13;
     } else {
       subText = info.lunarLabel;
       subColor = info.isSpecial

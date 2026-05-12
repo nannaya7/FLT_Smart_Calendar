@@ -11,11 +11,11 @@
 
 ## 2. 현재 진행 방향
 
-- 공휴일과 24절기 데이터는 공공데이터포털 한국천문연구원 `특일 정보 조회 서비스` 기준으로 진행한다.
-- 공공데이터포털 API 키는 아직 발급 전이다.
+- 공휴일과 24절기 등 특일 데이터는 공공데이터포털 한국천문연구원 `특일 정보 조회 서비스` 기준으로 진행한다.
+- 공공데이터포털 API 키는 빌드/실행 시 `--dart-define=HOLIDAY_API_KEY=...`로 주입한다.
+- 빌드타임 키가 없으면 앱 내부 입력창에서 입력받고, `SharedPreferences`에 저장한다.
 - API 키가 없을 때도 앱은 정상 실행되어야 한다.
-- API 키 미주입 상태에서는 공휴일/24절기 API 호출을 건너뛰고, 음력 표시와 로컬 일정 기능 중심으로 동작한다.
-- API 키 발급 후 `--dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>` 방식으로 주입한다.
+- API 키 미주입 상태에서는 특일 API 호출을 건너뛰고, 음력 표시와 로컬 일정 기능 중심으로 동작한다.
 
 ## 3. 핵심 기능
 
@@ -25,8 +25,7 @@
 - 각 날짜에 음력 월/일을 함께 표시한다.
 - 음력 1일, 15일은 별도 색상으로 강조한다.
 - 전통 음력 명절을 날짜 셀 서브텍스트로 표시한다.
-- 공공데이터포털 연동 후 법정 공휴일과 대체 공휴일을 표시한다.
-- 공공데이터포털 연동 후 24절기를 표시한다.
+- 공공데이터포털 연동 후 기념일, 공휴일, 국경일, 24절기을 표시한다.
 - 월 이동 시 이전/다음 방향에 맞춰 좌우 슬라이드 애니메이션을 적용한다.
 
 ### 3.2 일정 관리
@@ -77,7 +76,6 @@ smart_calendar/lib/
     calendar_engine.dart
     api/
       holiday_api_service.dart
-      google_calendar_service.dart
     db/
       database_helper.dart
     notifications/
@@ -99,7 +97,7 @@ smart_calendar/lib/
 - `calendar_page.dart`가 현재 메인 화면과 인라인 일정 패널을 담당한다.
 - `schedule_form_sheet.dart`가 일정 추가/수정을 담당한다.
 - `day_schedule_sheet.dart`는 이전 BottomSheet 방식 코드로 남아 있으며, 현재 메인 흐름에서는 `calendar_page.dart`의 인라인 패널이 중심이다.
-- `google_calendar_service.dart`는 이전 검토용 공휴일 API 래퍼로 남아 있다. 앞으로 공공데이터포털 기준으로 일원화하면서 제거 또는 미사용 처리할 예정이다.
+- 공공데이터포털 특일 정보 API로 데이터 소스를 일원화한다.
 
 ## 6. 데이터 모델
 
@@ -126,7 +124,7 @@ smart_calendar/lib/
 - `id`: DB 기본키
 - `date`: 양력 날짜, `YYYY-MM-DD`
 - `name`: 공휴일 또는 절기 이름
-- `type`: `holiday` 또는 `solar_term`
+- `type`: `anniversary`, `rest_day`, `national_holiday`, `solar_term`
 
 ## 7. DB 스키마
 
@@ -151,7 +149,7 @@ CREATE TABLE holidays (
     id    INTEGER PRIMARY KEY AUTOINCREMENT,
     date  TEXT    NOT NULL,
     name  TEXT    NOT NULL,
-    type  TEXT    NOT NULL
+    type  TEXT    NOT NULL  -- anniversary | rest_day | national_holiday | solar_term
 );
 ```
 
@@ -159,25 +157,38 @@ CREATE TABLE holidays (
 
 ### 8.1 목표
 
-공휴일과 24절기를 공공데이터포털 한국천문연구원 특일 정보 API로 가져오고, 연도별로 DB에 캐싱한다.
+기념일, 공휴일, 국경일, 24절기을 공공데이터포털 한국천문연구원 특일 정보 API로 가져오고, 연도별로 DB에 캐싱한다.
+
+조회 엔드포인트는 다음과 같다.
+
+- `getAnniversaryInfo`: 기념일
+- `getRestDeInfo`: 공휴일
+- `getHoliDeInfo`: 국경일
+- `get24DivisionsInfo`: 24절기
 
 ### 8.2 API 키 처리
 
-API 키는 소스에 저장하지 않는다.
+API 키는 소스에 저장하지 않는다. 기본 방식은 빌드/실행 시 `--dart-define=HOLIDAY_API_KEY=...`로 주입하는 것이다.
 
 ```bash
 flutter run --dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>
+flutter build ios --dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>
+flutter build apk --dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>
 ```
 
-`HOLIDAY_API_KEY`가 비어 있으면 API 서비스는 빈 리스트를 반환한다. 이 경우 앱은 네트워크 오류로 중단되지 않고 음력/일정 기능만 표시한다.
+빌드타임 키가 없으면 앱 최초 실행 시 API 키 입력 다이얼로그를 표시하고, 입력된 키를 `SharedPreferences`에 저장한다.
+
+저장된 API 키가 비어 있으면 API 서비스는 빈 리스트를 반환한다. 이 경우 앱은 네트워크 오류로 중단되지 않고 음력/일정 기능만 표시한다.
+인증키가 포함된 로컬 메모 파일은 커밋하지 않는다.
 
 ### 8.3 캐싱 정책
 
 - 연도별로 `holidays` 테이블에 저장한다.
 - 앱은 먼저 DB 캐시를 확인한다.
 - 캐시가 없으면 API를 호출한다.
-- 최초 설치 시 올해와 내년 데이터를 미리 가져오는 흐름을 유지한다.
-- 월말에는 다음 달 연도의 데이터를 갱신하는 흐름을 유지한다.
+- 최초 설치 시 올해와 내년의 4개 특일 데이터를 미리 가져온다.
+- 월말에는 다음 달이 속한 연도의 4개 특일 데이터를 강제 갱신한다.
+- 같은 날짜에 여러 특일이 있으면 공휴일, 24절기, 국경일, 기념일 순으로 우선 표시한다.
 
 ## 9. 화면 설계
 
@@ -194,10 +205,11 @@ flutter run --dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>
 
 - 양력 날짜
 - 일정 Dot 마커
-- 공휴일/절기/음력 명절/음력 날짜 중 하나의 서브텍스트
+- 공휴일/국경일/절기/음력 명절/음력 날짜 중 하나의 서브텍스트
 
 표시 우선순위는 API 데이터, 음력 명절, 음력 날짜 순서다.
 순수 음력 날짜는 `음` 접두어 없이 월·일만 표시한다.
+기념일은 달력 셀에 표시하지 않고, 선택 날짜의 하단 정보 패널에서만 표시한다.
 
 월 전환은 blur/fade 대신 좌우 슬라이드 애니메이션을 사용한다.
 
@@ -234,7 +246,6 @@ flutter run --dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>
 
 ## 11. 현재 주의사항
 
-- README 기준으로는 문서가 현행화되었지만, 코드에는 아직 Google Calendar 공휴일 서비스가 남아 있다.
 - 공공데이터포털 API 키 발급 후 실제 응답 구조와 서비스 키 인코딩 방식을 확인해야 한다.
 - 공휴일과 24절기가 같은 날짜에 겹칠 경우 현재 `Map<String, Holiday>` 구조는 하나만 보존할 수 있다. 복수 이벤트 표시가 필요하면 `Map<String, List<Holiday>>` 구조를 검토한다.
 - 음력 윤달 처리는 현재 명시 모델이 없다. 윤달 일정까지 지원할 경우 `isLeapMonth` 같은 필드가 필요할 수 있다.
@@ -242,9 +253,7 @@ flutter run --dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>
 
 ## 12. 다음 작업
 
-1. 공공데이터포털 API 키 발급
-2. `holiday_api_service.dart`로 공휴일과 24절기를 모두 조회하도록 정리
-3. `google_calendar_service.dart` 제거 또는 미사용 처리
-4. API 응답을 실제 키로 검증
-5. 공휴일/절기 중복 표시 구조 검토
-6. 주요 iPhone 화면 크기별 달력 카드 높이와 일정 카드 위치 추가 검증
+1. 실제 키로 4개 특일 엔드포인트 응답 검증
+2. 공휴일/절기/국경일 등 중복 표시 구조 검토
+3. 필요 시 `Map<String, List<Holiday>>` 구조로 확장
+4. 주요 iPhone 화면 크기별 달력 카드 높이와 일정 카드 위치 추가 검증

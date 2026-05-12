@@ -5,9 +5,11 @@ https://www.data.go.kr/tcs/dss/selectApiDataDetailView.do?publicDataPk=15012690
 ## 현재 진행 상태
 
 - 본 프로젝트는 공휴일과 24절기를 공공데이터포털 한국천문연구원 `특일 정보 조회 서비스` 기준으로 진행합니다.
-- API 키는 아직 발급 전입니다.
-- 키 발급 전에는 앱이 공휴일·절기 API 호출을 건너뛰고, 음력 표시와 로컬 일정 기능 중심으로 동작해야 합니다.
-- 키 발급 후 `--dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>` 형태로 주입합니다.
+- 현재 앱은 기념일, 공휴일, 국경일, 24절기을 모두 조회합니다.
+- API 키는 `--dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>` 형태로 주입합니다.
+- 빌드타임 키가 없으면 앱 내부 입력창에서 입력하고 앱 내부 저장소에 보관합니다.
+- 키가 없을 때에는 앱이 특일 API 호출을 건너뛰고, 음력 표시와 로컬 일정 기능 중심으로 동작해야 합니다.
+- 인증키가 포함된 로컬 메모 파일은 커밋하지 않습니다.
 
 이 API는 과학기술정보통신부 산하 한국천문연구원에서 관리하는 데이터를 제공하므로 국가 공인 데이터로서 가장 정확합니다. 구체적인 내용은 다음과 같습니다.
 
@@ -35,3 +37,8 @@ https://www.data.go.kr/tcs/dss/selectApiDataDetailView.do?publicDataPk=15012690
 API 호출 방식: http 패키지를 사용하여 연도(solYear)와 월(solMonth)을 파라미터로 던지면 XML 또는 JSON 형식으로 데이터를 돌려받습니다.
 
 데이터 캐싱: 휴일 데이터는 자주 바뀌지 않으므로, 앱을 켤 때마다 호출하기보다는 설계서 Step 3에 명시된 것처럼 **로컬 DB(sqflite)**에 연 단위로 저장(캐싱)하여 사용하는 것이 사용자 경험(UX) 측면에서 훨씬 빠릅니다.
+
+flutter run --dart-define=HOLIDAY_API_KEY=bb8460ec9fd251fdcaa97a8943b21e1b58d24ccb4f724b29966e2d0d57f6fc4a
+flutter build ios --dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>
+flutter build apk --dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>
+
