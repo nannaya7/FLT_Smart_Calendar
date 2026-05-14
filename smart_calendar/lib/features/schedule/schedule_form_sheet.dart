@@ -269,9 +269,9 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                           '${widget.date.year}. ${widget.date.month}. ${widget.date.day}  (음$_lunarMonth.$_lunarDay)',
                           style: const TextStyle(
                             fontFamily: 'Pretendard',
-                            fontSize: 14,
+                            fontSize: 17,
                             fontWeight: FontWeight.w400,
-                            color: _muted,
+                            color: Color(0xFFB48BD0),
                           ),
                         ),
                         const Spacer(),
