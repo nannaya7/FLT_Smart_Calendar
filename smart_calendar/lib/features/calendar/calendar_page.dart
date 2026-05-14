@@ -584,7 +584,9 @@ class _CalendarPageState extends State<CalendarPage> {
             image: DecorationImage(
               image: _heroBackgroundImage(),
               fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
+              alignment: _customBackgroundPath != null
+                  ? Alignment.center
+                  : Alignment.topCenter,
               colorFilter: const ColorFilter.mode(
                 Color(0x1AFFFFFF),
                 BlendMode.screen,
