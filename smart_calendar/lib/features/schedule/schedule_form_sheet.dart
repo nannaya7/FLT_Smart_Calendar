@@ -22,6 +22,7 @@ enum _Alarm {
 enum _Repeat {
   none('없음'),
   daily('매일'),
+  weekly('매주'),
   monthly('매월'),
   yearly('매년');
 
@@ -56,6 +57,7 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
   late int _lunarMonth;
   late int _lunarDay;
   bool _saving = false;
+  bool _repeatExpanded = false;
   int _selectedColor = _palette.first;
 
   // 일정 추가 카드 전체의 주요 색상입니다. 버튼/선택 상태 색을 바꾸려면 _accent를 수정하세요.
@@ -702,26 +704,113 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
   }
 
   Widget _repeatSelector() {
-    return PopupMenuButton<_Repeat>(
-      initialValue: _repeat,
-      onSelected: (value) => setState(() => _repeat = value),
-      itemBuilder: (context) => _Repeat.values
-          .map(
-            (repeat) => PopupMenuItem(value: repeat, child: Text(repeat.label)),
-          )
-          .toList(),
-      child: _formField(
-        // 반복 드롭다운 표시 영역입니다.
-        label: '반복',
-        trailing: const Icon(Icons.keyboard_arrow_down, size: 24),
-        child: Text(
-          _repeat.label,
-          style: const TextStyle(
-            fontFamily: 'Pretendard',
-            fontSize: 16,
-            color: _text,
-            fontWeight: FontWeight.w500,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _fieldBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.025),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => setState(() => _repeatExpanded = !_repeatExpanded),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 48),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 78,
+                    child: Text(
+                      '반복',
+                      style: TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: _text,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      _repeat.label,
+                      style: const TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 16,
+                        color: _text,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _repeatExpanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(Icons.keyboard_arrow_down, size: 24),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            child: _repeatExpanded
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Divider(height: 1, indent: 14, endIndent: 14),
+                      ..._Repeat.values.map(_repeatOption),
+                    ],
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _repeatOption(_Repeat r) {
+    final selected = _repeat == r;
+    final icon = switch (r) {
+      _Repeat.none    => Icons.remove_circle_outline,
+      _Repeat.daily   => Icons.loop,
+      _Repeat.weekly  => Icons.date_range,
+      _Repeat.monthly => Icons.calendar_month,
+      _Repeat.yearly  => Icons.event_repeat,
+    };
+    return InkWell(
+      onTap: () => setState(() {
+        _repeat = r;
+        _repeatExpanded = false;
+      }),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: selected ? _accent : _muted),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                r.label,
+                style: TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: 15,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  color: selected ? _accent : _text,
+                ),
+              ),
+            ),
+            if (selected) Icon(Icons.check_rounded, size: 18, color: _accent),
+          ],
         ),
       ),
     );

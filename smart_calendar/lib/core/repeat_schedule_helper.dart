@@ -23,6 +23,15 @@ abstract final class RepeatScheduleHelper {
           days,
           (i) => _dateKey(DateTime(month.year, month.month, i + 1)),
         );
+      case 'weekly':
+        final weekday = reg.weekday;
+        final totalDays = _daysInMonth(month.year, month.month);
+        final result = <String>[];
+        for (int d = 1; d <= totalDays; d++) {
+          final date = DateTime(month.year, month.month, d);
+          if (date.weekday == weekday) result.add(_dateKey(date));
+        }
+        return result;
       case 'monthly':
         if (s.isLunar) {
           if (s.lunarDay == null) return [];
@@ -62,6 +71,8 @@ abstract final class RepeatScheduleHelper {
     switch (s.repeatType) {
       case 'daily':
         return true;
+      case 'weekly':
+        return day.weekday == reg.weekday;
       case 'monthly':
         if (s.isLunar) {
           if (s.lunarDay == null) return false;

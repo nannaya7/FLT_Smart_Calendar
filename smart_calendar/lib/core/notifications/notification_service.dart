@@ -49,6 +49,8 @@ class NotificationService {
     DateTimeComponents? components;
     if (repeatType == 'daily') {
       components = DateTimeComponents.time;
+    } else if (repeatType == 'weekly') {
+      components = DateTimeComponents.dayOfWeekAndTime;
     } else if (repeatType == 'monthly') {
       components = DateTimeComponents.dayOfMonthAndTime;
     }
