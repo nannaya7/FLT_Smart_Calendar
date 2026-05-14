@@ -57,6 +57,7 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
   late int _lunarMonth;
   late int _lunarDay;
   bool _saving = false;
+  bool _alarmExpanded = false;
   bool _repeatExpanded = false;
   int _selectedColor = _palette.first;
 
@@ -680,24 +681,115 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
   }
 
   Widget _alarmSelector() {
-    return PopupMenuButton<_Alarm>(
-      initialValue: _alarm,
-      onSelected: (value) => setState(() => _alarm = value),
-      itemBuilder: (context) => _Alarm.values
-          .map((alarm) => PopupMenuItem(value: alarm, child: Text(alarm.label)))
-          .toList(),
-      child: _formField(
-        // 알림 드롭다운 표시 영역입니다.
-        label: '알림',
-        trailing: const Icon(Icons.keyboard_arrow_down, size: 24),
-        child: Text(
-          _alarm.label,
-          style: const TextStyle(
-            fontFamily: 'Pretendard',
-            fontSize: 16,
-            color: _text,
-            fontWeight: FontWeight.w500,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _fieldBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.025),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => setState(() => _alarmExpanded = !_alarmExpanded),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 48),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 78,
+                    child: Text(
+                      '알림',
+                      style: TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: _text,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      _alarm.label,
+                      style: const TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 16,
+                        color: _text,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _alarmExpanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(Icons.keyboard_arrow_down, size: 24),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            child: _alarmExpanded
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Divider(height: 1, indent: 14, endIndent: 14),
+                      ..._Alarm.values.map(_alarmOption),
+                    ],
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _alarmOption(_Alarm a) {
+    final selected = _alarm == a;
+    final icon = switch (a) {
+      _Alarm.none  => Icons.notifications_off_outlined,
+      _Alarm.onTime => Icons.notifications_outlined,
+      _Alarm.ten   => Icons.alarm,
+      _Alarm.fifteen => Icons.alarm,
+      _Alarm.thirty => Icons.alarm,
+      _Alarm.hour  => Icons.alarm,
+      _Alarm.day   => Icons.wb_twilight,
+    };
+    return InkWell(
+      onTap: () => setState(() {
+        _alarm = a;
+        _alarmExpanded = false;
+      }),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: selected ? _accent : _muted),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                a.label,
+                style: TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: 15,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  color: selected ? _accent : _text,
+                ),
+              ),
+            ),
+            if (selected) Icon(Icons.check_rounded, size: 18, color: _accent),
+          ],
         ),
       ),
     );
