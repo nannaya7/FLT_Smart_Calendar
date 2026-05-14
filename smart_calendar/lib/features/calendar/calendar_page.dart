@@ -735,6 +735,7 @@ class _CalendarPageState extends State<CalendarPage> {
           },
           headerVisible: false,
           startingDayOfWeek: StartingDayOfWeek.sunday,
+          availableGestures: AvailableGestures.horizontalSwipe,
           rowHeight: layout.calendarRowHeight,
           daysOfWeekHeight: layout.daysOfWeekHeight,
           sixWeekMonthsEnforced: true,
