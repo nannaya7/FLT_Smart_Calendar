@@ -1,134 +1,250 @@
 # 스마트 하이브리드 달력 현행 설계서
 
-작성일: 2026-05-11
+작성일: 2026-05-14
 
 ## 1. 프로젝트 개요
 
-스마트 하이브리드 달력은 Flutter 기반 Android/iOS 달력 앱이다. 양력 날짜를 기본으로 표시하면서 음력 날짜, 한국 전통 명절, 법정 공휴일, 대체 공휴일, 24절기, 사용자 일정을 함께 보여주는 것을 목표로 한다.
+Flutter 기반 Android/iOS 달력 앱. 양력 날짜를 기본으로 표시하면서 음력 날짜, 한국 전통 명절, 법정 공휴일, 대체 공휴일, 24절기, 사용자 일정을 함께 보여준다.
 
-현재 구현은 로컬 중심 앱 구조이며, 일정 데이터와 공휴일/절기 캐시는 기기 내 sqflite DB에 저장한다.
-메인 화면은 월별 배경 이미지 히어로, 흰색 달력 카드, 하단 일정 카드로 구성한다.
+로컬 중심 앱 구조. 일정 데이터와 공휴일/절기 캐시는 기기 내 sqflite DB에 저장한다.
+공휴일/24절기 소스는 공공데이터포털 한국천문연구원 `특일 정보 조회 서비스`로 일원화되어 있다.
 
-## 2. 현재 진행 방향
+## 2. 공공데이터포털 API 정책
 
-- 공휴일과 24절기 등 특일 데이터는 공공데이터포털 한국천문연구원 `특일 정보 조회 서비스` 기준으로 진행한다.
-- 공공데이터포털 API 키는 빌드/실행 시 `--dart-define=HOLIDAY_API_KEY=...`로 주입한다.
-- 빌드타임 키가 없으면 앱 내부 입력창에서 입력받고, `SharedPreferences`에 저장한다.
-- API 키가 없을 때도 앱은 정상 실행되어야 한다.
-- API 키 미주입 상태에서는 특일 API 호출을 건너뛰고, 음력 표시와 로컬 일정 기능 중심으로 동작한다.
+- API 키는 빌드/실행 시 `--dart-define=HOLIDAY_API_KEY=...`로 주입한다.
+- 빌드타임 키가 없으면 앱 최초 실행 시 내부 입력창에서 키를 입력하고 `SharedPreferences`에 저장한다.
+- API 키가 없을 때도 앱은 정상 실행된다 (음력 표시·로컬 일정 기능만 동작).
+- API 키가 있으면 앱 시작 시 올해·내년 데이터를 자동 프리패치한다.
 
 ## 3. 핵심 기능
 
 ### 3.1 하이브리드 달력
 
-- 양력 날짜를 날짜 셀의 메인 텍스트로 표시한다.
-- 각 날짜에 음력 월/일을 함께 표시한다.
-- 음력 1일, 15일은 별도 색상으로 강조한다.
-- 전통 음력 명절을 날짜 셀 서브텍스트로 표시한다.
-- 공공데이터포털 연동 후 기념일, 공휴일, 국경일, 24절기을 표시한다.
-- 월 이동 시 이전/다음 방향에 맞춰 좌우 슬라이드 애니메이션을 적용한다.
+- 양력 날짜(SpaceGrotesk) + 일정 Dot 마커(최대 3개) + 음력·특일 서브텍스트(Inter) 순 Column 구조
+- 음력 1일·15일 금색 강조, 전통 음력 명절 주황색 서브텍스트
+- 공공데이터포털 기준 공휴일/국경일 빨강, 24절기 초록
+- 기념일은 달력 셀에 표시하지 않고 하단 정보 패널에서만 표시
+- 월 전환: `AnimatedSwitcher` + `SlideTransition` 좌우 슬라이드 (방향성 반영)
 
 ### 3.2 일정 관리
 
-- 날짜 선택 시 하단 인라인 패널에 해당 날짜의 일정 목록을 표시한다.
-- 일정 추가/수정을 BottomSheet에서 처리한다.
-- 일정 삭제와 수정은 일정 아이템의 슬라이드 액션으로 처리한다.
-- 일정 항목은 제목, 메모, 시간, 알림 설정, 반복 유형, 양력/음력 여부를 가진다.
-- 일정이 있는 날짜는 날짜 셀에 Dot 마커를 표시한다.
+- 날짜 선택 → 하단 인라인 패널에서 목록 확인 및 추가/수정
+- `flutter_slidable`로 우측 슬라이드 → 수정(파랑) / 삭제(빨강)
+- 음력 일정 배지(금색), 반복 아이콘(보라), 알람 아이콘 표시
 
 ### 3.3 반복 일정
 
-- 반복 없음, 매일, 매월, 매년을 지원한다.
-- 양력 반복 일정은 저장된 양력 날짜를 기준으로 확장 표시한다.
-- 음력 반복 일정은 저장 시 음력 월/일을 보존한다.
-- 음력 매년 반복 일정은 해당 연도의 음력 날짜를 양력으로 환산해 표시한다.
+- 없음 / 매일 / 매월 / 매년
+- `RepeatScheduleHelper`에서 날짜 계산 로직 전담 (`datesInMonth`, `matchesDay`)
+- 음력 반복: `lunarMonth` / `lunarDay` 보존 → 매년 해당 음력 날짜의 양력 환산일에 자동 표시
 
 ### 3.4 알림
 
-- `flutter_local_notifications`로 로컬 푸시 알림을 예약한다.
-- 알림 시점은 정시, 10분 전, 30분 전, 1시간 전, 하루 전을 지원한다.
-- 매일 반복은 `DateTimeComponents.time`을 사용한다.
-- 매월 반복은 `DateTimeComponents.dayOfMonthAndTime`을 사용한다.
-- 매년 반복 알림은 플러그인 제약상 단발 알림으로 처리한다.
+- `flutter_local_notifications` + `timezone` (Asia/Seoul)
+- 프리셋: 없음 / 정시 / 10분 전 / 15분 전 / 30분 전 / 1시간 전 / 하루 전
+- 매일 반복: `DateTimeComponents.time`
+- 매월 반복: `DateTimeComponents.dayOfMonthAndTime`
+- 매년 반복: 단발 알림 (플러그인 제약)
 
-## 4. 기술 스택
+### 3.5 월별 배경 이미지
+
+- 기본: `image/01_JAN.png` ~ `image/12_DEC.png` 12장
+- 커스텀: `ImagePicker`로 갤러리 사진 선택 → `documents/month_backgrounds/` 저장
+- `SharedPreferences` 키 `month_background_{year}_{month}`로 경로 보존
+- 이전 파일 자동 삭제, 디폴트 복원 버튼 제공
+
+## 4. 화면 구조
+
+### 4.1 CalendarPage
+
+```
+Scaffold
+└── AnimatedSwitcher (월 전환 슬라이드)
+    └── Container (key = ValueKey("yyyy-M"))
+        └── Stack
+            ├── _buildHeroBackground()       ← 월별 배경 이미지 (커스텀/기본)
+            ├── SafeArea → LayoutBuilder
+            │   └── GestureDetector (수직 스와이프 → 액션바 토글)
+            │       └── Stack
+            │           ├── SingleChildScrollView
+            │           │   └── Column
+            │           │       ├── _buildHeader()       ← 글래스모피즘 헤더
+            │           │       ├── _buildCalendar()     ← 흰 카드 TableCalendar
+            │           │       ├── _buildInfoPanel()    ← 인라인 일정 패널
+            │           │       └── _buildFooter()       ← 응원 문구
+            │           └── _buildSwipeActionBar()       ← 하단 3버튼 액션바
+```
+
+#### _buildHeroBackground
+- `ClipRRect` (하단 36pt 라운드) + `DecorationImage` (fit: cover, alignment: topCenter)
+- 흰색 그라디언트 오버레이 (screen 블렌드)
+
+#### _buildHeader
+- `_glassBox()`: `BackdropFilter` (blur 8) + 반투명 흰 배경
+- 좌: 큰 월 숫자 (monthNumberFont: 71~91pt lerp)
+- 우: 연도 + 영문 월명 (FittedBox 줄임 처리)
+
+#### _buildCalendar
+- `TableCalendar` (headerVisible: false, startingDayOfWeek: sunday, sixWeekMonthsEnforced: true)
+- `CalendarBuilders`로 커스텀 셀 렌더링:
+  - `dowBuilder` → `_DowCell` (MON~SUN 영문, 일요일/토요일 색상)
+  - 그 외 → `_CalendarDayCell`
+
+#### _CalendarDayCell
+```
+Center → Container (dayCellWidth × dayCellHeight)
+  decoration: 선택=회색bg, 오늘=파란bg, 외부달=opacity 0.28
+  Column (mainAxisAlignment: center)
+    Text(양력 숫자, SpaceGrotesk)
+    SizedBox(dayDotAreaHeight) → Row(Dot × min(count, 3))
+    Text(서브텍스트, Inter)
+```
+서브텍스트 우선순위: API 특일 > 음력 명절 > 음력 날짜 (1일·15일 금색)
+
+#### _buildInfoPanel
+- `Container(height: infoPanelHeight)`, 흰 카드 + 그림자
+- 날짜 미선택: 안내 텍스트
+- 날짜 선택: 양력·음력 날짜 + 특일명 헤더 + `+ 일정 추가` 버튼 + `ListView`(일정 목록)
+
+#### _ScheduleListItem (Slidable)
+- 우측 슬라이드 → 수정(파랑) / 삭제(빨강)
+- 카테고리 컬러 원(9pt) + 제목 + 시간·메모 부제목 + 음력 배지 + 반복 아이콘 + 알람 아이콘
+
+#### _buildSwipeActionBar
+- `Positioned` (화면 하단, bottom: SafeArea+8)
+- `AnimatedSlide` + `AnimatedOpacity`로 숨김/표시
+- `AspectRatio(1536/346)` 안에 `BAR.png` + `_BarTapArea` × 3 (앨범 / 일정 / 정보)
+- 수직 스와이프 28pt 임계값: 위로 = 표시, 아래로 = 숨김
+
+### 4.2 ScheduleFormSheet
+
+```
+AnimatedPadding (viewInsets.bottom 키보드 대응)
+└── SizedBox(height: screenHeight)
+    └── Center → SingleChildScrollView
+        └── ConstrainedBox(maxWidth: 640)
+            └── Container (흰 카드, radius 24, 그림자)
+                └── Column
+                    ├── Row (제목 + 닫기 버튼)
+                    ├── _formField(제목 TextField)
+                    ├── _formField(날짜 표시, 달력 아이콘)
+                    ├── _calendarModeSelector()   ← 양력/음력 세그먼트 토글
+                    ├── _timeRow()                ← 시간 선택 버튼
+                    ├── _colorSelector()          ← 5색 팔레트 원형 선택기
+                    ├── _repeatSelector()         ← PopupMenuButton 드롭다운
+                    ├── _alarmSelector()          ← PopupMenuButton 드롭다운
+                    ├── _formField(내용 TextField, 3줄)
+                    └── Row(취소 버튼 | 저장 버튼)
+```
+
+- compact 모드: width < 390pt → 내부 여백 20pt (기본 30pt)
+- `_formField()`: 라벨 78pt 고정 너비 + 콘텐츠 + 옵션 trailing 아이콘
+- `_calendarModeSelector()`: 세그먼트 토글 — 선택된 쪽 흰 배경 + `_accent` 색상
+- `_colorSelector()`: 5색 원형 선택기 — 선택 시 체크 아이콘 + AnimatedContainer
+
+## 5. 반응형 레이아웃 (_CalendarLayout)
+
+`LayoutBuilder`에서 화면 너비를 받아 `_CalendarLayout.from(constraints)`로 생성.
+
+```
+compact:  width < 370
+normal:   370 ≤ width < 430
+expanded: width ≥ 430
+
+effectiveWidth = (width - padding*2).clamp(292, contentMaxWidth)
+scale = ((effectiveWidth - 292) / (390 - 292)).clamp(0.0, 1.0)
+lerp(min, max) = min + (max - min) * scale
+```
+
+주요 lerp 값:
+| 속성 | min (compact) | max (expanded) |
+|---|---|---|
+| monthNumberFont | 71pt | 91pt |
+| monthNameFont | 27pt | 33pt |
+| calendarRowHeight | 58pt | 66pt |
+| dayCellWidth | 37pt | 43pt |
+| dayNumberFont | 18pt | 22pt |
+| daySubFont | 10.5pt | 13pt |
+
+## 6. 기술 스택
 
 | 구분 | 기술 |
 |---|---|
 | Framework | Flutter / Dart |
-| State Management | 현재 StatefulWidget 중심, Riverpod은 향후 적용 후보 |
+| State Management | StatefulWidget 중심, Riverpod은 향후 후보 |
 | Local DB | sqflite |
 | Calendar UI | table_calendar |
 | Lunar Conversion | korean_lunar_utils |
 | HTTP Client | http |
 | Notifications | flutter_local_notifications |
 | Timezone | timezone |
-| Local Preferences | shared_preferences |
+| Slide Actions | flutter_slidable |
+| Image Picker | image_picker |
+| File Path | path_provider |
+| Local Prefs | shared_preferences |
 | External API | 공공데이터포털 한국천문연구원 특일 정보 API |
-| Text Scaling | `TextScaler.noScaling`으로 앱 전체 텍스트 스케일 고정 |
+| Fonts | Pretendard / Inter / SpaceGrotesk (Variable) |
+| Text Scaling | `TextScaler.noScaling` 앱 전체 고정 |
 
-## 5. 디렉터리 구조
+## 7. 디렉터리 구조
 
-```text
+```
 smart_calendar/lib/
   main.dart
   core/
-    calendar_engine.dart
+    calendar_engine.dart            # 음력 변환 래퍼 (CalendarEngine 싱글톤)
+    repeat_schedule_helper.dart     # 반복 일정 날짜 계산 (RepeatScheduleHelper)
     api/
-      holiday_api_service.dart
+      holiday_api_service.dart      # 공공데이터포털 특일 API 래퍼
     db/
-      database_helper.dart
+      database_helper.dart          # sqflite CRUD (v5)
     notifications/
-      notification_service.dart
+      notification_service.dart     # 알림 초기화 및 스케줄링
   features/
     calendar/
-      calendar_page.dart
+      calendar_page.dart            # 메인 화면 (700줄+)
     schedule/
-      schedule_form_sheet.dart
-      day_schedule_sheet.dart
+      schedule_form_sheet.dart      # 일정 등록·수정 카드 폼
   shared/
     models/
-      holiday.dart
-      schedule.dart
+      holiday.dart                  # Holiday 모델
+      schedule.dart                 # Schedule 모델
 ```
 
-### 구조 메모
+## 8. 데이터 모델
 
-- `calendar_page.dart`가 현재 메인 화면과 인라인 일정 패널을 담당한다.
-- `schedule_form_sheet.dart`가 일정 추가/수정을 담당한다.
-- `day_schedule_sheet.dart`는 이전 BottomSheet 방식 코드로 남아 있으며, 현재 메인 흐름에서는 `calendar_page.dart`의 인라인 패널이 중심이다.
-- 공공데이터포털 특일 정보 API로 데이터 소스를 일원화한다.
+### 8.1 Schedule
 
-## 6. 데이터 모델
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| id | int? | DB PK |
+| title | String | 일정 제목 |
+| memo | String? | 메모 |
+| solarDate | String | 양력 기준 저장일 (YYYY-MM-DD) |
+| time | String? | 시작 시간 (HH:mm) |
+| endTime | String? | 종료 시간 (HH:mm) — 현재 미사용 |
+| location | String? | 장소 — 현재 미사용 |
+| isLunar | bool | 음력 일정 여부 |
+| alarmMinutesBefore | int? | 알림 선행 시간 (분) |
+| categoryColor | int | 일정 색상 (ARGB) |
+| repeatType | String? | null / daily / monthly / yearly |
+| lunarMonth | int? | 음력 월 (isLunar=true 일 때) |
+| lunarDay | int? | 음력 일 (isLunar=true 일 때) |
 
-### 6.1 Schedule
+### 8.2 Holiday
 
-일정 모델은 다음 정보를 가진다.
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| id | int? | DB PK |
+| date | String | 날짜 (YYYY-MM-DD) |
+| name | String | 특일 이름 |
+| type | String | anniversary / rest_day / national_holiday / solar_term |
 
-- `id`: DB 기본키
-- `title`: 일정 제목
-- `memo`: 메모
-- `solarDate`: 양력 기준 저장일, `YYYY-MM-DD`
-- `time`: 일정 시간, `HH:mm`
-- `isLunar`: 음력 일정 여부
-- `alarmMinutesBefore`: 알림 선행 시간
-- `categoryColor`: 일정 색상
-- `repeatType`: `null`, `daily`, `monthly`, `yearly`
-- `lunarMonth`: 음력 월
-- `lunarDay`: 음력 일
+- `isPublicHoliday`: type == 'rest_day'
+- `isAnniversary`: type == 'anniversary'
+- `insertPriority(map, h)`: 같은 날짜에 우선순위 높은 것만 map에 유지 (rest_day 50 > solar_term 40 > national_holiday 35 > anniversary 20)
 
-### 6.2 Holiday
-
-공휴일/절기 모델은 다음 정보를 가진다.
-
-- `id`: DB 기본키
-- `date`: 양력 날짜, `YYYY-MM-DD`
-- `name`: 공휴일 또는 절기 이름
-- `type`: `anniversary`, `rest_day`, `national_holiday`, `solar_term`
-
-## 7. DB 스키마
-
-현재 DB 버전은 v4다.
+## 9. DB 스키마 (v5)
 
 ```sql
 CREATE TABLE schedules (
@@ -137,6 +253,8 @@ CREATE TABLE schedules (
     memo                  TEXT,
     solar_date            TEXT    NOT NULL,
     time                  TEXT,
+    end_time              TEXT,
+    location              TEXT,
     is_lunar              INTEGER NOT NULL DEFAULT 0,
     alarm_minutes_before  INTEGER,
     category_color        INTEGER NOT NULL DEFAULT 4280391411,
@@ -149,111 +267,73 @@ CREATE TABLE holidays (
     id    INTEGER PRIMARY KEY AUTOINCREMENT,
     date  TEXT    NOT NULL,
     name  TEXT    NOT NULL,
-    type  TEXT    NOT NULL  -- anniversary | rest_day | national_holiday | solar_term
+    type  TEXT    NOT NULL
 );
 ```
 
-## 8. 공휴일/24절기 연동 설계
+마이그레이션 경로:
+- v1 → v2: holidays 테이블 생성
+- v2 → v3: repeat_type 추가
+- v3 → v4: lunar_month, lunar_day 추가
+- v4 → v5: end_time, location 추가
 
-### 8.1 목표
+## 10. 공휴일/절기 연동
 
-기념일, 공휴일, 국경일, 24절기을 공공데이터포털 한국천문연구원 특일 정보 API로 가져오고, 연도별로 DB에 캐싱한다.
+### 엔드포인트
 
-조회 엔드포인트는 다음과 같다.
+| 엔드포인트 | type | 설명 |
+|---|---|---|
+| getAnniversaryInfo | anniversary | 기념일 |
+| getRestDeInfo | rest_day | 공휴일 (법정 공휴일, 대체 공휴일) |
+| getHoliDeInfo | national_holiday | 국경일 |
+| get24DivisionsInfo | solar_term | 24절기 |
 
-- `getAnniversaryInfo`: 기념일
-- `getRestDeInfo`: 공휴일
-- `getHoliDeInfo`: 국경일
-- `get24DivisionsInfo`: 24절기
+### 캐싱 정책
 
-### 8.2 API 키 처리
+1. 앱 시작 시 DB 캐시 확인 → 없으면 API 호출
+2. 최초 설치: 올해 + 내년 데이터 프리패치 (`holiday_initialized` flag)
+3. 매월 말일: 다음 달이 속한 연도 강제 갱신 (`holiday_refreshed_{year}_{month}` flag)
+4. 달력 셀용(`_calendarHolidays`)과 정보 패널용(`_holidays`) 맵을 분리 — 기념일은 정보 패널에서만 표시
 
-API 키는 소스에 저장하지 않는다. 기본 방식은 빌드/실행 시 `--dart-define=HOLIDAY_API_KEY=...`로 주입하는 것이다.
+## 11. 색상 규칙
 
-```bash
-flutter run --dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>
-flutter build ios --dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>
-flutter build apk --dart-define=HOLIDAY_API_KEY=<공공데이터포털_API_키>
-```
-
-빌드타임 키가 없으면 앱 최초 실행 시 API 키 입력 다이얼로그를 표시하고, 입력된 키를 `SharedPreferences`에 저장한다.
-
-저장된 API 키가 비어 있으면 API 서비스는 빈 리스트를 반환한다. 이 경우 앱은 네트워크 오류로 중단되지 않고 음력/일정 기능만 표시한다.
-인증키가 포함된 로컬 메모 파일은 커밋하지 않는다.
-
-### 8.3 캐싱 정책
-
-- 연도별로 `holidays` 테이블에 저장한다.
-- 앱은 먼저 DB 캐시를 확인한다.
-- 캐시가 없으면 API를 호출한다.
-- 최초 설치 시 올해와 내년의 4개 특일 데이터를 미리 가져온다.
-- 월말에는 다음 달이 속한 연도의 4개 특일 데이터를 강제 갱신한다.
-- 같은 날짜에 여러 특일이 있으면 공휴일, 24절기, 국경일, 기념일 순으로 우선 표시한다.
-
-## 9. 화면 설계
-
-### 9.1 CalendarPage
-
-메인 화면은 월 배경 이미지 히어로 위에 달력과 하단 일정 패널을 배치한다.
-
-- 상단: 큰 월 숫자, 연도, 영문 월명 헤더
-- 중앙: `TableCalendar` 기반 흰색 카드형 달력
-- 하단: 선택 날짜의 일정 패널 카드
-- 푸터: 짧은 응원 문구
-
-날짜 셀에는 다음 요소를 표시한다.
-
-- 양력 날짜
-- 일정 Dot 마커
-- 공휴일/국경일/절기/음력 명절/음력 날짜 중 하나의 서브텍스트
-
-표시 우선순위는 API 데이터, 음력 명절, 음력 날짜 순서다.
-순수 음력 날짜는 `음` 접두어 없이 월·일만 표시한다.
-기념일은 달력 셀에 표시하지 않고, 선택 날짜의 하단 정보 패널에서만 표시한다.
-
-월 전환은 blur/fade 대신 좌우 슬라이드 애니메이션을 사용한다.
-
-- 다음 달: 오른쪽에서 들어옴
-- 이전 달: 왼쪽에서 들어옴
-- 화면 key는 `연도-월` 기준으로 관리한다.
-
-기기별 폰트 차이를 줄이기 위해 `MaterialApp.builder`에서 `TextScaler.noScaling`을 적용한다.
-
-### 9.2 ScheduleFormSheet
-
-일정 추가/수정 BottomSheet다.
-
-- 양력/음력 모드 선택
-- 제목 입력
-- 메모 입력
-- 시간 선택
-- 알림 프리셋 선택
-- 반복 유형 선택
-- 저장/취소
-
-## 10. 색상 규칙
-
-| 구분 | 색상 |
+| 구분 | 색상 코드 |
 |---|---|
-| 일요일 / 법정 공휴일 | Red |
-| 토요일 | Blue |
-| 24절기 | Green |
-| 음력 명절·특일 서브텍스트 | Orange |
-| 평일 | 기본 텍스트 색상 |
-| 선택 날짜 | Light Blue 계열 배경 |
-| 반복 아이콘 | Purple 계열 |
-| 음력 배지 | Amber 계열 |
+| 일요일 / 법정 공휴일 날짜 숫자 | `#FF3B30` |
+| 토요일 날짜 숫자 | `#2E73D8` |
+| 공휴일·국경일 서브텍스트 | `#FF6E4A` |
+| 24절기 서브텍스트 | `#4FA96A` |
+| 음력 명절 서브텍스트 | `#FF6E4A` |
+| 음력 1일·15일 서브텍스트 | `#B8920A` (금색) |
+| 음력 일반 서브텍스트 | `#656B75` |
+| 오늘 배경 | `#EAF2FF` |
+| 선택일 배경 | `#EDEEF5` |
+| 일정 Dot 마커 | `#3678CF` |
+| 음력 배지 배경 | `#B8920A` 15% 투명 |
+| 반복 아이콘 | `#8B7CB8` |
+| 알람 아이콘 | `#AA9898` |
 
-## 11. 현재 주의사항
+### 일정 카테고리 팔레트 (5색)
 
-- 공공데이터포털 API 키 발급 후 실제 응답 구조와 서비스 키 인코딩 방식을 확인해야 한다.
-- 공휴일과 24절기가 같은 날짜에 겹칠 경우 현재 `Map<String, Holiday>` 구조는 하나만 보존할 수 있다. 복수 이벤트 표시가 필요하면 `Map<String, List<Holiday>>` 구조를 검토한다.
-- 음력 윤달 처리는 현재 명시 모델이 없다. 윤달 일정까지 지원할 경우 `isLeapMonth` 같은 필드가 필요할 수 있다.
-- 월별 이미지, 달력 행 높이, 양력/음력 텍스트 간격은 iPhone / iPhone Pro Max 실기기 화면을 보며 계속 미세 조정한다.
+| 색상 | 코드 |
+|---|---|
+| 핑크 | `#FF8999` |
+| 그린 | `#83C8AA` |
+| 퍼플 | `#B48BD0` |
+| 오렌지 | `#E9B174` |
+| 블루 | `#8CB4E8` |
 
-## 12. 다음 작업
+## 12. 현재 미완성/보류 항목
 
-1. 실제 키로 4개 특일 엔드포인트 응답 검증
-2. 공휴일/절기/국경일 등 중복 표시 구조 검토
-3. 필요 시 `Map<String, List<Holiday>>` 구조로 확장
-4. 주요 iPhone 화면 크기별 달력 카드 높이와 일정 카드 위치 추가 검증
+- 스와이프 액션바 **정보 버튼** — 현재 SnackBar placeholder
+- `endTime` / `location` — 모델·DB 준비됨, UI 폼에서는 아직 `null`로 저장
+- `repeat_schedule_helper.dart` — 미커밋 상태
+
+## 13. 다음 작업 후보
+
+1. 스와이프 액션바 정보 버튼 기능 구현 (설정, API 키 재입력 등)
+2. 일정 폼에 종료 시간 / 장소 필드 UI 추가
+3. 반복 일정 삭제 시 단일 삭제 vs 전체 삭제 선택 UI
+4. 공휴일 API 응답 실기기 검증
+5. 음력 윤달 처리 (`isLeapMonth` 필드 검토)
+6. Riverpod 상태 관리 전환

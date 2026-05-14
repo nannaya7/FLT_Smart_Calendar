@@ -1,5 +1,153 @@
 # 개발 히스토리
 
+## 현재 작업 중 (미커밋) — 2026-05-14
+
+### UI 전면 재설계
+
+#### CalendarPage 구조 분리
+- 기존 `calendar_page.dart` 내 인라인 위젯을 독립 클래스로 분리
+  - `_CalendarLayout` — 화면 너비(compact < 370 / normal / expanded ≥ 430) 기준으로 폰트·패딩·높이를 `lerp()`로 선형 보간하는 반응형 레이아웃 클래스
+  - `_CalendarDayCell` — 날짜 셀 StatelessWidget (양력 숫자 / dot 마커 / 음력·특일 서브텍스트)
+  - `_DowCell` — 요일 헤더 셀 (MON ~ SUN)
+  - `_ScheduleListItem` — Slidable 기반 일정 목록 아이템 (수정·삭제 슬라이드 액션 + 음력 배지 + 반복 아이콘 + 알람 아이콘)
+  - `_BarTapArea` — 하단 액션바 버튼 터치 영역 (Semantics 포함)
+  - `_BackgroundPickerSheet` / `_BackgroundActionTile` — 배경 이미지 선택 시트
+
+#### 스와이프 액션바 (`_buildSwipeActionBar`)
+- 화면 전체 `GestureDetector`의 수직 스와이프(28pt 이상)로 액션바 노출/숨김
+- `AnimatedSlide` + `AnimatedOpacity` 조합으로 하단에서 올라오는 애니메이션
+- `bar/BAR.png` 이미지 위에 투명 터치 영역 3개 배치: 앨범 / 일정 / 정보
+- 현재 정보 버튼은 SnackBar 메시지로 placeholder 처리
+
+#### 월별 배경 이미지 커스터마이징
+- 앨범 버튼 탭 → `_BackgroundPickerSheet` 표시
+- `ImagePicker`로 사진 선택 → `getApplicationDocumentsDirectory()/month_backgrounds/` 복사 저장
+- `SharedPreferences`에 월별 경로 저장 (`month_background_{year}_{month}`)
+- 이전 배경 파일 자동 삭제 후 새 파일 적용
+- 디폴트 버튼으로 기본 월별 이미지 복원 (파일 삭제 + prefs 제거)
+
+#### 글래스모피즘 헤더
+- `BackdropFilter` (`dart:ui.ImageFilter.blur`) + 반투명 흰 배경의 `_glassBox()` 헬퍼
+- 좌: 큰 월 숫자 / 우: 연도 + 영문 월명 (FittedBox로 줄임 처리)
+
+#### 반응형 레이아웃 (`_CalendarLayout`)
+- `LayoutBuilder`에서 화면 너비로 `_CalendarLayout.from()` 생성
+- compact(< 370) / normal / expanded(≥ 430) 3단계 + `lerp()` 선형 보간
+- 폰트 크기·패딩·행 높이·패널 높이·액션바 너비 등 28개 속성 통합 관리
+
+### 일정 폼 시트 (`ScheduleFormSheet`) 전면 개편
+- `AnimatedPadding` + `viewInsets.bottom`으로 키보드 올라올 때 카드 자동 이동
+- 카드 최대 너비 640pt, `compact`(< 390pt) 모드별 내부 여백 분리
+- 필드 구성: 제목 / 날짜(표시만) / 기준(양력·음력 세그먼트 토글) / 시간 / 색상 / 반복 / 알림 / 내용
+- `_colorSelector()` — 5색 팔레트 원형 선택기 (`AnimatedContainer` + 체크 아이콘)
+- `_calendarModeSelector()` — 슬라이딩 세그먼트 컨트롤 (양력/음력)
+- `_alarmSelector()` / `_repeatSelector()` — `PopupMenuButton` 드롭다운
+- `_formField()` 공통 컨테이너 (라벨 78pt 고정, 외곽선 + 미세 그림자)
+- `endTime` / `location` — 모델·DB에는 존재하나 현재 UI에서는 `null`로 저장
+
+### 데이터 모델 확장
+- `Schedule`: `endTime`, `location` 필드 추가 / `copyWith` 및 `toMap`/`fromMap` 업데이트
+- `Holiday`: `isPublicHoliday`, `isAnniversary` getter 추가 / `insertPriority()` 정적 메서드 추가 / `_priority()` 로직을 모델로 이동
+- `DatabaseHelper`: DB v4 → v5 (`end_time TEXT`, `location TEXT` 컬럼 추가, `_onUpgrade` v5 처리)
+
+### 반복 일정 헬퍼 분리
+- `lib/core/repeat_schedule_helper.dart` 신규 파일 (`RepeatScheduleHelper` abstract class)
+  - `datesInMonth(Schedule, DateTime, CalendarEngine)` — 주어진 달에 반복 일정이 표시될 날짜 키 목록 반환
+  - `matchesDay(Schedule, DateTime, CalendarEngine)` — 특정 날짜에 반복 일정 해당 여부 반환
+  - `daily` / `monthly`(양력·음력) / `yearly`(양력·음력) 모든 조합 처리
+
+### 파일 삭제
+- `lib/features/schedule/day_schedule_sheet.dart` 삭제 — 기능이 `calendar_page.dart` 인라인 패널로 완전 통합됨
+
+---
+
+## V.0.01.100 — 2026-05-12
+
+### 공공데이터포털 API 일원화 완성
+- `google_calendar_service.dart` 삭제 — 공공데이터포털 단일 소스로 확정
+- `HolidayApiService` 전면 개편:
+  - `hasBuildTimeApiKey` getter — 빌드타임 키 존재 여부 동기 확인
+  - `getApiKey()` / `saveApiKey()` — `SharedPreferences` 연동 (빌드타임 키 우선)
+  - `hasApiKey()` async — 키 존재 여부 비동기 확인
+  - `fetchAllSpecialDays(year)` — 기념일·공휴일·국경일·24절기 4개 엔드포인트 병렬 호출
+  - `isHoliday == 'Y'` 필터 제거 → 모든 항목 포함, type으로 구분
+- `CalendarPage`에 앱 내 API 키 입력 다이얼로그 추가:
+  - `_apiKeyPromptShown` 중복 표시 방지 플래그
+  - `_ensureHolidayApiKey()` — 빌드타임 키 없을 때 최초 실행 시 한 번만 호출
+  - `_showApiKeyDialog()` — `AlertDialog` 기반 입력창 (나중에/저장 버튼)
+  - 키 저장 후 올해·내년 데이터 즉시 프리패치
+- 달력 표시용 `_calendarHolidays` 맵 분리 (기념일 제외) — 기존 `_holidays`와 이원화
+
+---
+
+## V.0.01.011 — 2026-05-11
+
+### 월별 배경 이미지 + 반응형 레이아웃 기반 구축
+- 월별 배경 이미지 12개 추가 (`image/01_JAN.png` ~ `image/12_DEC.png`)
+- 앱 아이콘 재교체 (캘린더 디자인 변경)
+- pubspec.yaml: Pretendard / Inter / SpaceGrotesk 폰트 등록
+
+#### CalendarPage 개편
+- 고정 `_rowHeight`/`_dowHeight` 상수 → `_CalendarLayout` 반응형 레이아웃 초기 도입
+- `AnimatedSwitcher` + `SlideTransition` 월 전환 애니메이션 적용
+  - `_monthTransitionDirection` 상태로 방향 결정 (+1 다음 달, -1 이전 달)
+  - `_monthPageKey` (`연도-월`) 기반 `ValueKey`로 위젯 교체 트리거
+- `SingleChildScrollView` 기반 스크롤 구조로 전환
+- `_buildHeroBackground()` — 월별 이미지 히어로 배경 (하단 라운드 클립)
+- 스와이프 액션바 1차 구현 (`_buildSwipeActionBar`) — `BAR.png` 이미지 기반
+- `_monthNames` 영문 배열, `_monthImages` 경로 배열 추가
+- `precacheImage` 이미지 프리캐싱 (`initState`)
+
+#### main.dart
+- `deferFirstFrame` / `allowFirstFrame` 적용 — 1초 splash 후 첫 프레임 허용
+
+#### 문서 현행화
+- `HISTORY.md`, `README.md`, `doc/current_design.md`, `CLAUDE.md` 전면 갱신
+
+---
+
+## V.0.00.700 — 2026-05-09
+
+### 폰트 / 패키지 / 반복 일정 인프라
+
+#### 폰트 추가
+- Pretendard Variable / Inter Variable / SpaceGrotesk 폰트 파일 추가 (`fonts/`)
+
+#### 패키지 추가
+- `flutter_slidable: ^3.1.1` — 일정 아이템 슬라이드 액션
+- `image_picker: ^1.2.2` — 갤러리 사진 선택
+- `path_provider: ^2.1.5` — 앱 문서 디렉터리 경로 조회
+- `flutter_launcher_icons: ^0.14.3` — 앱 아이콘 자동 생성
+
+#### DatabaseHelper
+- `getAllRepeatSchedules()` 추가 — `repeat_type IS NOT NULL` 전체 조회
+- `clearHolidaysByYear(year)` 추가 — 연도별 공휴일 강제 삭제 (갱신 전 사용)
+
+#### CalendarPage
+- Google Calendar API + 공공데이터포털 병행 구조 (`_googleService` + `_apiService`)
+- `_loadSchedules()`: 비반복 일정 + `getAllRepeatSchedules()` 기반 Dot 마커 집계 개선
+- Slidable 일정 아이템 첫 적용
+- 월별 배경 이미지 SharedPreferences 저장 기반 초기 설계
+
+#### ScheduleFormSheet
+- 카드형 UI 전면 개편 (흰 카드 + 그림자 + 둥근 모서리)
+
+---
+
+## V.0.00.530 — 2026-05-07
+
+### 앱 아이콘 적용
+- Android / iOS 앱 아이콘 교체 (`flutter_launcher_icons` 빌드 결과물 반영)
+
+---
+
+## V.0.00.521 — 2026-05-07
+
+### 앱 아이콘 소스 추가
+- `calendar_app_icon.png` 아이콘 원본 파일 추가
+
+---
+
 ## V.0.00.520 — 2026-05-11
 
 ### 공공데이터포털 특일 API 확장

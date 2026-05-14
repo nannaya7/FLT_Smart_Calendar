@@ -5,7 +5,7 @@ import '../../shared/models/holiday.dart';
 
 class DatabaseHelper {
   static const _dbName = 'smart_calendar.db';
-  static const _dbVersion = 4;
+  static const _dbVersion = 5;
   static const tableSchedules = 'schedules';
   static const tableHolidays = 'holidays';
 
@@ -38,6 +38,8 @@ class DatabaseHelper {
         memo                 TEXT,
         solar_date           TEXT    NOT NULL,
         time                 TEXT,
+        end_time             TEXT,
+        location             TEXT,
         is_lunar             INTEGER NOT NULL DEFAULT 0,
         alarm_minutes_before INTEGER,
         category_color       INTEGER NOT NULL DEFAULT ${0xFF2196F3},
@@ -53,13 +55,20 @@ class DatabaseHelper {
     if (oldVersion < 2) await _createHolidaysTable(db);
     if (oldVersion < 3) {
       await db.execute(
-          'ALTER TABLE $tableSchedules ADD COLUMN repeat_type TEXT');
+        'ALTER TABLE $tableSchedules ADD COLUMN repeat_type TEXT',
+      );
     }
     if (oldVersion < 4) {
       await db.execute(
-          'ALTER TABLE $tableSchedules ADD COLUMN lunar_month INTEGER');
+        'ALTER TABLE $tableSchedules ADD COLUMN lunar_month INTEGER',
+      );
       await db.execute(
-          'ALTER TABLE $tableSchedules ADD COLUMN lunar_day INTEGER');
+        'ALTER TABLE $tableSchedules ADD COLUMN lunar_day INTEGER',
+      );
+    }
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE $tableSchedules ADD COLUMN end_time TEXT');
+      await db.execute('ALTER TABLE $tableSchedules ADD COLUMN location TEXT');
     }
   }
 
@@ -85,7 +94,10 @@ class DatabaseHelper {
 
   Future<List<Schedule>> getAllSchedules() async {
     final db = await database;
-    final rows = await db.query(tableSchedules, orderBy: 'solar_date ASC, time ASC');
+    final rows = await db.query(
+      tableSchedules,
+      orderBy: 'solar_date ASC, time ASC',
+    );
     return rows.map(Schedule.fromMap).toList();
   }
 
@@ -137,7 +149,11 @@ class DatabaseHelper {
 
   Future<Schedule?> getScheduleById(int id) async {
     final db = await database;
-    final rows = await db.query(tableSchedules, where: 'id = ?', whereArgs: [id]);
+    final rows = await db.query(
+      tableSchedules,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
     if (rows.isEmpty) return null;
     return Schedule.fromMap(rows.first);
   }
@@ -173,8 +189,11 @@ class DatabaseHelper {
     final db = await database;
     final batch = db.batch();
     for (final h in holidays) {
-      batch.insert(tableHolidays, h.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.ignore);
+      batch.insert(
+        tableHolidays,
+        h.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
     }
     await batch.commit(noResult: true);
   }
@@ -191,16 +210,21 @@ class DatabaseHelper {
 
   Future<void> clearHolidaysByYear(int year) async {
     final db = await database;
-    await db.delete(tableHolidays,
-        where: "date LIKE ?", whereArgs: ['$year-%']);
+    await db.delete(
+      tableHolidays,
+      where: "date LIKE ?",
+      whereArgs: ['$year-%'],
+    );
   }
 
   Future<bool> hasHolidaysForYear(int year) async {
     final db = await database;
-    final count = Sqflite.firstIntValue(await db.rawQuery(
-      'SELECT COUNT(*) FROM $tableHolidays WHERE date LIKE ?',
-      ['$year-%'],
-    ));
+    final count = Sqflite.firstIntValue(
+      await db.rawQuery(
+        'SELECT COUNT(*) FROM $tableHolidays WHERE date LIKE ?',
+        ['$year-%'],
+      ),
+    );
     return (count ?? 0) > 0;
   }
 

@@ -1,11 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'core/notifications/notification_service.dart';
 import 'features/calendar/calendar_page.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+  binding.deferFirstFrame();
+
+  final splashDelay = Future<void>.delayed(const Duration(seconds: 1));
   await NotificationService.instance.init();
+
   runApp(const SmartCalendarApp());
+  await splashDelay;
+  binding.allowFirstFrame();
 }
 
 class SmartCalendarApp extends StatelessWidget {

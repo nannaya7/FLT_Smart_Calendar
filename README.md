@@ -35,9 +35,17 @@
 
 - 날짜 탭 → 하단 인라인 패널에서 일정 목록 확인 및 추가/수정
 - 패널 헤더에 양력·음력 날짜 동시 표기, 절기·명절 서브텍스트 표시
-- 일정 항목: 제목, 메모, 시간, 알림 설정, 반복 유형, 양력/음력 구분
-- 스와이프 액션으로 일정 수정 및 삭제
+- 일정 항목: 제목, 메모, 시간, 알림 설정, 반복 유형, 양력/음력 구분, 카테고리 색상 (5색)
+- 스와이프(→) 액션으로 일정 수정(파랑) / 삭제(빨강)
 - 일정 있는 날짜에 Dot 마커 표시 (최대 3개)
+- 음력 일정 배지(금색) 및 반복 아이콘(보라) 표시
+
+### 스와이프 액션바
+
+- 화면 전체를 위로 스와이프하면 하단에서 3버튼 바가 올라옴
+- 앨범: 현재 달 배경 이미지를 갤러리 사진으로 교체 / 기본 이미지로 초기화
+- 일정: 선택된 날짜(미선택 시 오늘)에 일정 추가 폼 바로 열기
+- 정보: 추후 구현 예정
 
 ### 화면 표시 안정화
 
@@ -72,7 +80,12 @@
 | HTTP Client | http | ^1.2.0 |
 | Notifications | flutter_local_notifications | ^18.0.0 |
 | Timezone | timezone | ^0.9.4 |
+| Slide Actions | flutter_slidable | ^3.1.1 |
+| Image Picker | image_picker | ^1.2.2 |
+| File Path | path_provider | ^2.1.5 |
+| Local Prefs | shared_preferences | ^2.3.4 |
 | External API | 공공데이터포털 한국천문연구원 특일 정보 API | `HOLIDAY_API_KEY` |
+| Fonts | Pretendard / Inter / SpaceGrotesk | Variable |
 
 ---
 
@@ -84,28 +97,28 @@
 lib/
   core/
     calendar_engine.dart          # 음력 변환 및 명절 판별 (CalendarEngine)
+    repeat_schedule_helper.dart   # 반복 일정 날짜 계산 헬퍼 (RepeatScheduleHelper)
     api/
       holiday_api_service.dart    # 공공데이터포털 특일 정보 API 래퍼
-      google_calendar_service.dart # 이전 검토용 공휴일 API 래퍼 (향후 제거/미사용 예정)
     db/
       database_helper.dart        # sqflite CRUD (schedules + holidays)
     notifications/
       notification_service.dart   # 알림 초기화 및 스케줄링
   features/
     calendar/
-      calendar_page.dart          # 월별 이미지 달력 UI + 인라인 일정 패널 + 월 전환 애니메이션
+      calendar_page.dart          # 메인 달력 UI — 히어로 배경·글래스 헤더·반응형 레이아웃·스와이프 액션바·인라인 일정 패널
     schedule/
-      schedule_form_sheet.dart    # 일정 등록 BottomSheet
+      schedule_form_sheet.dart    # 일정 등록·수정 카드형 BottomSheet
   shared/
     models/
-      schedule.dart               # 일정 모델
-      holiday.dart                # 공휴일·절기 모델
+      schedule.dart               # 일정 모델 (endTime, location 포함)
+      holiday.dart                # 공휴일·절기 모델 (insertPriority 우선순위 관리)
   main.dart
 ```
 
 ---
 
-## DB 스키마 (v4)
+## DB 스키마 (v5)
 
 ```sql
 CREATE TABLE schedules (
@@ -114,6 +127,8 @@ CREATE TABLE schedules (
     memo                  TEXT,
     solar_date            TEXT    NOT NULL,   -- YYYY-MM-DD (양력 기준)
     time                  TEXT,               -- HH:mm
+    end_time              TEXT,               -- HH:mm (종료 시간, 미사용)
+    location              TEXT,               -- 장소 (미사용)
     is_lunar              INTEGER DEFAULT 0,  -- 0: 양력, 1: 음력
     alarm_minutes_before  INTEGER,
     category_color        INTEGER DEFAULT 0xFF2196F3,
@@ -160,8 +175,8 @@ API 키 없이 실행하면 특일 API 호출을 건너뛰고 음력 데이터�
 
 ## 향후 계획
 
-- 공휴일 데이터 소스를 공공데이터포털로 일원화
-- 실제 API 응답 기준 특일 표시 우선순위 검증
+- 스와이프 액션바 정보 버튼 기능 구현
+- `endTime` / `location` 필드 UI 노출 (종료 시간, 장소)
 - Riverpod 상태 관리 적용
 - 라이트/다크 테마 전환 (`shared/theme/`)
 - 홈 화면 위젯 (오늘 일정 & 음력 날짜)
