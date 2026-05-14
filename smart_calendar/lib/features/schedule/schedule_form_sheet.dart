@@ -131,6 +131,83 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
     final picked = await showTimePicker(
       context: context,
       initialTime: _startTime ?? TimeOfDay.now(),
+      initialEntryMode: TimePickerEntryMode.dial,
+      helpText: '시간 선택',
+      confirmText: '확인',
+      cancelText: '취소',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFFFF8999),
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Color(0xFF202124),
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFFFF8999),
+                textStyle: const TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+            timePickerTheme: TimePickerThemeData(
+              backgroundColor: Colors.white,
+              dialBackgroundColor: const Color(0xFFF5F5F5),
+              dialHandColor: const Color(0xFFFF8999),
+              dialTextColor: WidgetStateColor.resolveWith(
+                (states) => states.contains(WidgetState.selected)
+                    ? Colors.white
+                    : const Color(0xFF202124),
+              ),
+              hourMinuteColor: WidgetStateColor.resolveWith(
+                (states) => states.contains(WidgetState.selected)
+                    ? const Color(0xFFFFE4E8)
+                    : const Color(0xFFF3F4F6),
+              ),
+              hourMinuteTextColor: WidgetStateColor.resolveWith(
+                (states) => states.contains(WidgetState.selected)
+                    ? const Color(0xFFFF8999)
+                    : const Color(0xFF202124),
+              ),
+              dayPeriodColor: WidgetStateColor.resolveWith(
+                (states) => states.contains(WidgetState.selected)
+                    ? const Color(0xFFFFE4E8)
+                    : const Color(0xFFF3F4F6),
+              ),
+              dayPeriodTextColor: WidgetStateColor.resolveWith(
+                (states) => states.contains(WidgetState.selected)
+                    ? const Color(0xFFFF8999)
+                    : const Color(0xFF9EA2A8),
+              ),
+              hourMinuteShape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              dayPeriodShape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              helpTextStyle: const TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF202124),
+              ),
+            ),
+          ),
+          child: MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              alwaysUse24HourFormat: false,
+            ),
+            child: child!,
+          ),
+        );
+      },
     );
     if (picked == null) return;
     setState(() => _startTime = picked);
@@ -269,9 +346,9 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                           '${widget.date.year}. ${widget.date.month}. ${widget.date.day}  (음$_lunarMonth.$_lunarDay)',
                           style: const TextStyle(
                             fontFamily: 'Pretendard',
-                            fontSize: 17,
-                            fontWeight: FontWeight.w400,
-                            color: Color(0xFFB48BD0),
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF80E080),
                           ),
                         ),
                         const Spacer(),

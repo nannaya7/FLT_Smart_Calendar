@@ -75,3 +75,7 @@ lib/
 - 스와이프 액션바 **일정** 버튼: `_MonthlyScheduleSheet` 팝업으로 해당 달 전체 일정·특일 목록 표시 (일정 추가 폼 아님)
 - 스와이프 액션바 **정보** 버튼: `splash/app_info.png` 전체 화면 오버레이 (`showGeneralDialog` + FadeTransition, 탭으로 닫기)
 - `splash/` 디렉터리는 pubspec.yaml assets에 등록되어 있음
+- 일정 추가/수정 폼 헤더: "일정 추가" 제목 옆에 `yyyy. M. d  (음M.d)` 형식으로 날짜 표시 — 녹색(`0xFF80E080`), bold, 16px
+- 반복·알림 셀렉터: `PopupMenuButton` 대신 `AnimatedSize` + `AnimatedRotation` 인라인 확장 리스트 패턴 사용
+- 시간 선택 피커: `showTimePicker`에 `builder`로 커스텀 `Theme` 주입 — `_accent`(핑크) 컬러스킴, 클락 다이얼(`TimePickerEntryMode.dial`), 한국어 버튼, 12시간제
+- `TableCalendar`의 `availableGestures: AvailableGestures.horizontalSwipe` — 달력 셀 위 상하 스와이프 제스처 충돌 방지
