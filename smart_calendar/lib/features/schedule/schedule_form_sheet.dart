@@ -201,11 +201,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
       '${d.year}-${d.month.toString().padLeft(2, '0')}-'
       '${d.day.toString().padLeft(2, '0')}';
 
-  static String _dateLabel(DateTime d) {
-    const wd = ['월', '화', '수', '목', '금', '토', '일'];
-    return '${d.year}. ${d.month}. ${d.day} (${wd[d.weekday - 1]})';
-  }
-
   @override
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.viewInsetsOf(context);
@@ -256,8 +251,9 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // 상단 제목과 닫기 버튼 영역입니다.
+                    // 상단 제목과 날짜, 닫기 버튼 영역입니다.
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Text(
                           _isEditing ? '일정 수정' : '일정 추가',
@@ -266,6 +262,16 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
                             color: _text,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          '${widget.date.year}. ${widget.date.month}. ${widget.date.day}  (음$_lunarMonth.$_lunarDay)',
+                          style: const TextStyle(
+                            fontFamily: 'Pretendard',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            color: _muted,
                           ),
                         ),
                         const Spacer(),
@@ -284,25 +290,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                       child: _plainInput(
                         controller: _titleCtrl,
                         hint: '일정 제목을 입력하세요',
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    // 날짜 표시 영역입니다. 현재는 선택한 날짜를 보여주기만 합니다.
-                    _formField(
-                      label: '날짜',
-                      trailing: const Icon(
-                        Icons.calendar_month_outlined,
-                        size: 22,
-                        color: Color(0xFF555B63),
-                      ),
-                      child: Text(
-                        _dateLabel(widget.date),
-                        style: const TextStyle(
-                          fontFamily: 'Pretendard',
-                          fontSize: 17,
-                          color: _text,
-                          fontWeight: FontWeight.w500,
-                        ),
                       ),
                     ),
                     const SizedBox(height: 10),
