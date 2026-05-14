@@ -1031,10 +1031,10 @@ class _BackgroundPickerSheet extends StatelessWidget {
       top: false,
       child: Container(
         margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.14),
@@ -1057,31 +1057,90 @@ class _BackgroundPickerSheet extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              '$year년 $month월 배경',
-              style: const TextStyle(
-                fontFamily: 'Pretendard',
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF30343A),
-              ),
+            const SizedBox(height: 20),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5EDE0),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.image_outlined,
+                    color: Color(0xFFC4936A),
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      '배경 선택',
+                      style: TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF202124),
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      '캘린더 배경을 변경해 보세요.',
+                      style: TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 13,
+                        color: Color(0xFF9EA2A8),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
             _BackgroundActionTile(
+              iconBgColor: const Color(0xFFEEEFF2),
               icon: Icons.photo_library_outlined,
-              title: '앨범에서 사진 선택',
-              subtitle: '선택한 사진을 이 달의 배경으로 사용합니다',
+              iconColor: const Color(0xFF7A818C),
+              title: '사진에서 선택',
+              subtitle: '앨범의 사진을 배경으로 설정합니다.',
               onTap: () => Navigator.of(context).pop(_BackgroundAction.photo),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             _BackgroundActionTile(
-              icon: Icons.wallpaper_outlined,
-              title: '디폴트',
-              subtitle: '기본 앱의 월별 배경 이미지로 되돌립니다',
+              iconBgColor: const Color(0xFFFFEAE4),
+              icon: Icons.landscape_outlined,
+              iconColor: const Color(0xFFD4907A),
+              title: '기본 배경 사용',
+              subtitle: '내장된 배경 중에서 선택합니다.',
               onTap: () =>
                   Navigator.of(context).pop(_BackgroundAction.defaultImage),
             ),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                height: 54,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                alignment: Alignment.center,
+                child: const Text(
+                  '취소',
+                  style: TextStyle(
+                    fontFamily: 'Pretendard',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF50545C),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
           ],
         ),
       ),
@@ -1090,13 +1149,17 @@ class _BackgroundPickerSheet extends StatelessWidget {
 }
 
 class _BackgroundActionTile extends StatelessWidget {
+  final Color iconBgColor;
   final IconData icon;
+  final Color iconColor;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
 
   const _BackgroundActionTile({
+    required this.iconBgColor,
     required this.icon,
+    required this.iconColor,
     required this.title,
     required this.subtitle,
     required this.onTap,
@@ -1105,17 +1168,29 @@ class _BackgroundActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFFF6F7F9),
-      borderRadius: BorderRadius.circular(12),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFEEEFF2)),
+            borderRadius: BorderRadius.circular(14),
+          ),
           child: Row(
             children: [
-              Icon(icon, color: const Color(0xFF53606D), size: 24),
-              const SizedBox(width: 12),
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: iconBgColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1124,9 +1199,9 @@ class _BackgroundActionTile extends StatelessWidget {
                       title,
                       style: const TextStyle(
                         fontFamily: 'Pretendard',
-                        fontSize: 14,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF30343A),
+                        color: Color(0xFF202124),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -1135,7 +1210,7 @@ class _BackgroundActionTile extends StatelessWidget {
                       style: const TextStyle(
                         fontFamily: 'Pretendard',
                         fontSize: 12,
-                        color: Color(0xFF7A818C),
+                        color: Color(0xFF9EA2A8),
                       ),
                     ),
                   ],
@@ -1143,7 +1218,7 @@ class _BackgroundActionTile extends StatelessWidget {
               ),
               const Icon(
                 Icons.chevron_right,
-                color: Color(0xFF9AA1AA),
+                color: Color(0xFFBCC0C8),
                 size: 20,
               ),
             ],
