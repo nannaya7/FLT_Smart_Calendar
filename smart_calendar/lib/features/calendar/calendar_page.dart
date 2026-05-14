@@ -389,12 +389,18 @@ class _CalendarPageState extends State<CalendarPage> {
     }
   }
 
-  Future<void> _openAddFormFromBar() async {
-    if (_selectedDay == null) {
-      final today = DateTime.now();
-      await _onDayTap(today, today);
-    }
-    await _openAddForm();
+  Future<void> _openMonthlyScheduleSheet() async {
+    _hideActionBar();
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _MonthlyScheduleSheet(
+        month: _focusedDay,
+        holidays: _holidays,
+        engine: _engine,
+      ),
+    );
   }
 
   void _showBarMessage(String message) {
@@ -403,6 +409,22 @@ class _CalendarPageState extends State<CalendarPage> {
         content: Text(message),
         duration: const Duration(milliseconds: 1200),
       ),
+    );
+  }
+
+  void _showInfoOverlay() {
+    _hideActionBar();
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '닫기',
+      barrierColor: Colors.black.withValues(alpha: 0.88),
+      transitionDuration: const Duration(milliseconds: 280),
+      transitionBuilder: (_, animation, _, child) => FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+        child: child,
+      ),
+      pageBuilder: (_, _, _) => const _InfoOverlay(),
     );
   }
 
@@ -967,13 +989,13 @@ class _CalendarPageState extends State<CalendarPage> {
                           Expanded(
                             child: _BarTapArea(
                               label: '일정',
-                              onTap: _openAddFormFromBar,
+                              onTap: _openMonthlyScheduleSheet,
                             ),
                           ),
                           Expanded(
                             child: _BarTapArea(
                               label: '정보',
-                              onTap: () => _showBarMessage('정보'),
+                              onTap: _showInfoOverlay,
                             ),
                           ),
                         ],
@@ -1457,6 +1479,29 @@ class _BarTapArea extends StatelessWidget {
   }
 }
 
+// ── 정보 오버레이 ─────────────────────────────────────────────────────────────
+
+class _InfoOverlay extends StatelessWidget {
+  const _InfoOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pop(),
+      behavior: HitTestBehavior.opaque,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Center(
+          child: Image.asset(
+            'splash/app_info.png',
+            fit: BoxFit.contain,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── 일정 목록 아이템 ──────────────────────────────────────────────────────────
 
 class _ScheduleListItem extends StatelessWidget {
@@ -1572,6 +1617,316 @@ class _ScheduleListItem extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── 월별 일정 시트 데이터 ───────────────────────────────────────────────────────
+
+class _MonthItem {
+  final DateTime date;
+  final String title;
+  final Color dotColor;
+  final String rightLabel;
+  final Color rightLabelColor;
+
+  const _MonthItem({
+    required this.date,
+    required this.title,
+    required this.dotColor,
+    required this.rightLabel,
+    required this.rightLabelColor,
+  });
+}
+
+// ── 월별 일정 시트 ────────────────────────────────────────────────────────────
+
+class _MonthlyScheduleSheet extends StatefulWidget {
+  final DateTime month;
+  final Map<String, Holiday> holidays;
+  final CalendarEngine engine;
+
+  const _MonthlyScheduleSheet({
+    required this.month,
+    required this.holidays,
+    required this.engine,
+  });
+
+  @override
+  State<_MonthlyScheduleSheet> createState() => _MonthlyScheduleSheetState();
+}
+
+class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet> {
+  List<_MonthItem>? _items;
+
+  static const _weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    final month = widget.month;
+    final ym =
+        '${month.year}-${month.month.toString().padLeft(2, '0')}';
+    final prefix = '$ym-';
+
+    final regular = await DatabaseHelper.instance.getSchedulesByMonth(ym);
+    final repeats = await DatabaseHelper.instance.getAllRepeatSchedules();
+
+    final items = <_MonthItem>[];
+
+    // 공휴일·절기·기념일
+    for (final entry in widget.holidays.entries) {
+      if (!entry.key.startsWith(prefix)) continue;
+      final h = entry.value;
+      final date = DateTime.parse(entry.key);
+      items.add(_MonthItem(
+        date: date,
+        title: h.name,
+        dotColor: _dotColor(h.type),
+        rightLabel: _rightLabel(h.type),
+        rightLabelColor: _rightColor(h.type),
+      ));
+    }
+
+    // 일반(비반복) 일정
+    for (final s in regular) {
+      if (s.repeatType != null) continue;
+      items.add(_fromSchedule(s, DateTime.parse(s.solarDate)));
+    }
+
+    // 반복 일정
+    for (final s in repeats) {
+      for (final key
+          in RepeatScheduleHelper.datesInMonth(s, month, widget.engine)) {
+        items.add(_fromSchedule(s, DateTime.parse(key)));
+      }
+    }
+
+    items.sort((a, b) => a.date.compareTo(b.date));
+
+    if (!mounted) return;
+    setState(() => _items = items);
+  }
+
+  static Color _dotColor(String type) => switch (type) {
+        'rest_day' || 'national_holiday' => const Color(0xFFFF3B30),
+        'solar_term' => const Color(0xFF4FA96A),
+        'anniversary' => const Color(0xFFE9B174),
+        _ => const Color(0xFF747B86),
+      };
+
+  static String _rightLabel(String type) => switch (type) {
+        'rest_day' => '공휴일',
+        'national_holiday' => '국경일',
+        'solar_term' => '절기',
+        'anniversary' => '기념일',
+        _ => '',
+      };
+
+  static Color _rightColor(String type) => switch (type) {
+        'rest_day' || 'national_holiday' => const Color(0xFFFF3B30),
+        'solar_term' => const Color(0xFF4FA96A),
+        'anniversary' => const Color(0xFFE9B174),
+        _ => const Color(0xFF747B86),
+      };
+
+  static _MonthItem _fromSchedule(Schedule s, DateTime date) => _MonthItem(
+        date: date,
+        title: s.title,
+        dotColor: Color(s.categoryColor),
+        rightLabel: _fmtTime(s.time),
+        rightLabelColor: const Color(0xFF747B86),
+      );
+
+  static String _fmtTime(String? t) {
+    if (t == null) return '';
+    final parts = t.split(':');
+    if (parts.length != 2) return t;
+    final h = int.parse(parts[0]);
+    final m = parts[1];
+    if (h == 0) return '오전 12:$m';
+    if (h < 12) return '오전 $h:$m';
+    if (h == 12) return '오후 12:$m';
+    return '오후 ${h - 12}:$m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.viewInsetsOf(context);
+    final size = MediaQuery.sizeOf(context);
+    final compact = size.width < 390;
+
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsets.only(bottom: viewInsets.bottom),
+      child: SizedBox(
+        height: size.height * 0.75,
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? 16 : 24,
+              vertical: 24,
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.96),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 40,
+                      offset: const Offset(0, 16),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildHeader(compact),
+                    const Divider(height: 1, color: Color(0xFFEAECEF)),
+                    Expanded(child: _buildList(compact)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(bool compact) {
+    final m = widget.month;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        compact ? 20 : 28,
+        compact ? 18 : 22,
+        compact ? 16 : 20,
+        compact ? 14 : 18,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '${m.year}년 ${m.month}월 일정',
+              style: TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: compact ? 17 : 19,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF202124),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(Icons.close, color: Color(0xFF9EA2A8), size: 22),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildList(bool compact) {
+    final items = _items;
+    if (items == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (items.isEmpty) {
+      return const Center(
+        child: Text(
+          '이달의 일정이 없습니다',
+          style: TextStyle(
+            fontFamily: 'Pretendard',
+            color: Color(0xFF9EA2A8),
+            fontSize: 14,
+          ),
+        ),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      itemCount: items.length,
+      separatorBuilder: (_, _) => const Divider(
+        height: 1,
+        color: Color(0xFFEAECEF),
+        indent: 20,
+        endIndent: 20,
+      ),
+      itemBuilder: (_, i) => _buildRow(items[i], compact),
+    );
+  }
+
+  Widget _buildRow(_MonthItem item, bool compact) {
+    final d = item.date;
+    final dateStr =
+        '${d.month}. ${d.day} (${_weekdayNames[d.weekday - 1]})';
+
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 18 : 24,
+        vertical: 12,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            margin: const EdgeInsets.only(top: 1),
+            decoration: BoxDecoration(
+              color: item.dotColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: compact ? 80 : 88,
+            child: Text(
+              dateStr,
+              style: TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: compact ? 12 : 13,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF50545C),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              item.title,
+              style: TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: compact ? 13 : 13.5,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF202124),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (item.rightLabel.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            Text(
+              item.rightLabel,
+              style: TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: compact ? 11 : 12,
+                fontWeight: FontWeight.w500,
+                color: item.rightLabelColor,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

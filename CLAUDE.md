@@ -72,3 +72,6 @@ lib/
 - 메인 달력 UI는 월별 이미지 히어로 + 흰색 카드형 달력 + 일정 카드 구조를 유지한다
 - 날짜 셀의 양력/음력 폰트와 간격은 작은 iPhone과 Pro Max에서 모두 확인한다
 - 월 전환 애니메이션은 이전/다음 방향에 맞춘 좌우 슬라이드 방식을 사용한다
+- 스와이프 액션바 **일정** 버튼: `_MonthlyScheduleSheet` 팝업으로 해당 달 전체 일정·특일 목록 표시 (일정 추가 폼 아님)
+- 스와이프 액션바 **정보** 버튼: `splash/app_info.png` 전체 화면 오버레이 (`showGeneralDialog` + FadeTransition, 탭으로 닫기)
+- `splash/` 디렉터리는 pubspec.yaml assets에 등록되어 있음
