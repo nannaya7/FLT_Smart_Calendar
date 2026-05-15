@@ -1,6 +1,48 @@
 # 개발 히스토리
 
-## 현재 작업 중 (미커밋) — 2026-05-14
+## V.0.30.101 — 2026-05-15
+
+### 앱 아이콘 교체
+- `pubspec.yaml` `flutter_launcher_icons.image_path`를 `calendar_icon2.png`로 변경
+
+### 스플래시 화면 교체
+- `splash_screen1.png`를 Android `drawable-nodpi/splash_screen.png` 및 iOS `LaunchImage.imageset/` (LaunchImage, @2x, @3x) 모두에 적용
+
+### 앱 정보 화면 개선
+- `app_info1.png` 이미지로 교체
+- `_AppActionRow`에 `showArrow` 파라미터 추가 — 화살표를 오픈소스 라이선스 행에서만 표시
+- 평가하기 행 및 해당 구분선 삭제
+
+### 월간 일정 팝업 (`_MonthlyScheduleSheet`) 전면 개선
+
+#### 높이 및 탭 구조
+- 팝업 높이 20% 증가: `size.height * 0.75` → `size.height * 0.90`
+- 4개 탭으로 분리: 나의 일정 / 공휴일 / 기념일 / 전체
+  - `SingleTickerProviderStateMixin` + `TabController(length: 4)` 적용
+  - `TabBar` + `TabBarView(physics: NeverScrollableScrollPhysics())`
+
+#### 데이터 분리
+- 단일 `_items` → `_mySchedules`, `_publicHolidays`, `_anniversaries`, `_allItems` 4개 리스트
+  - 공휴일 탭: `rest_day`, `national_holiday` 타입
+  - 기념일 탭: `solar_term`, `anniversary` 타입
+  - 전체 탭: 3개 목록 합산 후 날짜순 정렬
+
+#### 사잇날 감지
+- 주중 평일 중 전날·다음날이 모두 쉬는 날(주말 또는 공휴일)이면 사잇날으로 판별
+- 공휴일·전체 탭에만 초록색(`0xFF4FA96A`)으로 표시 (달력에는 미표시)
+- `_isNonWorking(DateTime)` 헬퍼 메서드 추가
+- `_MonthItem`에 선택적 `titleColor` 필드 추가
+
+#### 탭 스와이프 네비게이션
+- `GestureDetector.onHorizontalDragEnd` (임계값 primaryVelocity 300)
+- 우→좌 스와이프: 다음 탭 이동; 마지막 탭(전체)에서 → 다음 달 나의 일정 탭
+- 좌→우 스와이프: 이전 탭 이동; 첫 탭(나의 일정)에서 → 이전 달 전체 탭
+- `_changeMonth(int delta, {int targetTab})` 메서드 — 달 전환 + 탭 초기화 연동
+- `_buildHeader`가 `_month` 상태 기준으로 렌더링 (달 전환 후에도 헤더 갱신)
+
+---
+
+## V.0.20.x — 2026-05-14
 
 ### UI 전면 재설계
 

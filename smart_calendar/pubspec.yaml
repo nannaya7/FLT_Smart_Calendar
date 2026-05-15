@@ -55,7 +55,7 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "icon/calendar_icon1.png"
+  image_path: "image/icon/calendar_icon2.png"
   remove_alpha_ios: true
 
 # For information on the generic Dart part of this file, see the
@@ -71,8 +71,9 @@ flutter:
 
   assets:
     - image/
-    - bar/
-    - splash/
+    - image/bar/
+    - image/splash/
+    - image/icon/
 
   fonts:
     - family: SpaceGrotesk

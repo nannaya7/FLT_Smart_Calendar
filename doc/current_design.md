@@ -116,7 +116,46 @@ Center → Container (dayCellWidth × dayCellHeight)
 - `AspectRatio(1536/346)` 안에 `BAR.png` + `_BarTapArea` × 3 (앨범 / 일정 / 정보)
 - 수직 스와이프 28pt 임계값: 위로 = 표시, 아래로 = 숨김
 
-### 4.2 ScheduleFormSheet
+### 4.2 _MonthlyScheduleSheet
+
+스와이프 액션바 **일정** 버튼으로 호출. `showModalBottomSheet`로 표시.
+
+```
+SizedBox(height: size.height * 0.90)   ← 전체 화면의 90%
+└── GestureDetector (onHorizontalDragEnd → 탭 또는 달 전환)
+    └── Column
+        ├── _buildHeader()             ← _month 기준 연·월 표시 + 좌우 화살표 버튼
+        ├── _buildTabBar()             ← TabBar (나의 일정 / 공휴일 / 기념일 / 전체)
+        ├── Divider
+        └── Expanded → TabBarView (NeverScrollableScrollPhysics)
+            ├── _buildList(_mySchedules, ...)
+            ├── _buildList(_publicHolidays, ...)
+            ├── _buildList(_anniversaries, ...)
+            └── _buildList(_allItems, ...)
+```
+
+#### 탭 분류 기준
+
+| 탭 | 포함 데이터 |
+|---|---|
+| 나의 일정 | `schedules` 테이블 (비반복 + 반복 헬퍼 기준) |
+| 공휴일 | `rest_day`, `national_holiday` + 사잇날 |
+| 기념일 | `solar_term`, `anniversary` |
+| 전체 | 위 세 탭 합산, 날짜순 정렬 |
+
+#### 사잇날 감지
+
+`_isNonWorking(DateTime)`: 주말이거나 `rest_day`/`national_holiday` 타입 특일이면 `true`.
+월 내 모든 주중 평일을 순회하며 전날·다음날이 모두 `_isNonWorking == true`인 날을 사잇날으로 판별.
+사잇날은 공휴일·전체 탭에만 추가, 달력 셀에는 표시하지 않음.
+
+#### 스와이프 네비게이션
+
+- 우→좌 (velocity < −300): 다음 탭; 마지막 탭(index 3)에서 → `_changeMonth(1, targetTab: 0)`
+- 좌→우 (velocity > 300): 이전 탭; 첫 탭(index 0)에서 → `_changeMonth(-1, targetTab: 3)`
+- `_changeMonth` 호출 시 `_month` 갱신, 4개 데이터 리스트 초기화, `_tabController.animateTo(targetTab)`, `_loadItems()` 순 실행
+
+### 4.3 ScheduleFormSheet
 
 ```
 AnimatedPadding (viewInsets.bottom 키보드 대응)
@@ -325,9 +364,7 @@ CREATE TABLE holidays (
 
 ## 12. 현재 미완성/보류 항목
 
-- 스와이프 액션바 **정보 버튼** — 현재 SnackBar placeholder
 - `endTime` / `location` — 모델·DB 준비됨, UI 폼에서는 아직 `null`로 저장
-- `repeat_schedule_helper.dart` — 미커밋 상태
 
 ## 13. 다음 작업 후보
 

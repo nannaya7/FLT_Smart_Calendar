@@ -414,17 +414,8 @@ class _CalendarPageState extends State<CalendarPage> {
 
   void _showInfoOverlay() {
     _hideActionBar();
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: '닫기',
-      barrierColor: Colors.black.withValues(alpha: 0.88),
-      transitionDuration: const Duration(milliseconds: 280),
-      transitionBuilder: (_, animation, _, child) => FadeTransition(
-        opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
-        child: child,
-      ),
-      pageBuilder: (_, _, _) => const _InfoOverlay(),
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const _AppInfoPage()),
     );
   }
 
@@ -980,7 +971,7 @@ class _CalendarPageState extends State<CalendarPage> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.asset('bar/BAR.png', fit: BoxFit.contain),
+                      Image.asset('image/bar/BAR.png', fit: BoxFit.contain),
                       Row(
                         children: [
                           Expanded(
@@ -1557,23 +1548,271 @@ class _BarTapArea extends StatelessWidget {
   }
 }
 
-// ── 정보 오버레이 ─────────────────────────────────────────────────────────────
+// ── 앱 정보 페이지 ────────────────────────────────────────────────────────────
 
-class _InfoOverlay extends StatelessWidget {
-  const _InfoOverlay();
+class _AppInfoPage extends StatelessWidget {
+  const _AppInfoPage();
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.of(context).pop(),
-      behavior: HitTestBehavior.opaque,
+    return MediaQuery(
+      data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
       child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Center(
-          child: Image.asset(
-            'splash/app_info.png',
-            fit: BoxFit.contain,
+        backgroundColor: const Color(0xFFF5EDE6),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFFF5EDE6),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: Color(0xFF2F2F2F),
+              size: 20,
+            ),
+            onPressed: () => Navigator.of(context).pop(),
           ),
+          title: const Text(
+            '앱 정보',
+            style: TextStyle(
+              fontFamily: 'Pretendard',
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF2F2F2F),
+            ),
+          ),
+          centerTitle: true,
+        ),
+        body: SingleChildScrollView(
+          child: Column(
+            children: [
+              Image.asset(
+                'image/splash/app_info1.png',
+                width: double.infinity,
+                fit: BoxFit.fitWidth,
+                errorBuilder: (_, _, _) => Container(
+                  height: 220,
+                  color: const Color(0xFFEEE0D0),
+                  child: const Center(
+                    child: Text(
+                      '이미지 준비 중',
+                      style: TextStyle(
+                        fontFamily: 'Pretendard',
+                        color: Color(0xFFB09070),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: const [
+                          _AppInfoRow(
+                            icon: Icons.info_outline,
+                            label: '버전 정보',
+                            value: '1.0.0',
+                          ),
+                          Divider(
+                            height: 1,
+                            indent: 20,
+                            endIndent: 20,
+                            color: Color(0xFFEEEFF2),
+                          ),
+                          _AppInfoRow(
+                            icon: Icons.calendar_month_outlined,
+                            label: '앱 이름',
+                            value: '까사음력달력',
+                          ),
+                          Divider(
+                            height: 1,
+                            indent: 20,
+                            endIndent: 20,
+                            color: Color(0xFFEEEFF2),
+                          ),
+                          _AppInfoRow(
+                            icon: Icons.task_alt_outlined,
+                            label: '개발자',
+                            value: 'LEES CASAWARE LAB',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      '기타',
+                      style: TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFC4936A),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: [
+                          _AppActionRow(
+                            icon: Icons.code,
+                            label: '오픈소스 라이선스',
+                            subtitle: '사용된 오픈소스 라이선스 정보',
+                            showArrow: true,
+                            onTap: () => showLicensePage(
+                              context: context,
+                              applicationName: '까사음력달력',
+                              applicationVersion: '1.0.0',
+                              applicationLegalese:
+                                  '© 2026 LEES CASAWARE LAB',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                    const Center(
+                      child: Column(
+                        children: [
+                          Text(
+                            '© 2026 LEES CASAWARE LAB',
+                            style: TextStyle(
+                              fontFamily: 'Pretendard',
+                              fontSize: 12,
+                              color: Color(0xFF9EA2A8),
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'All rights reserved.',
+                            style: TextStyle(
+                              fontFamily: 'Pretendard',
+                              fontSize: 12,
+                              color: Color(0xFF9EA2A8),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AppInfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _AppInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          Icon(icon, color: const Color(0xFFC4936A), size: 22),
+          const SizedBox(width: 14),
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'Pretendard',
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF2F2F2F),
+            ),
+          ),
+          const Spacer(),
+          Text(
+            value,
+            style: const TextStyle(
+              fontFamily: 'Pretendard',
+              fontSize: 14,
+              color: Color(0xFF9EA2A8),
+            ),
+          ),
+          const SizedBox(width: 6),
+        ],
+      ),
+    );
+  }
+}
+
+class _AppActionRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool showArrow;
+
+  const _AppActionRow({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+    this.showArrow = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            Icon(icon, color: const Color(0xFFC4936A), size: 22),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontFamily: 'Pretendard',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF2F2F2F),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontFamily: 'Pretendard',
+                      fontSize: 12,
+                      color: Color(0xFF9EA2A8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (showArrow)
+              const Icon(Icons.chevron_right, color: Color(0xFFBCC0C8), size: 18),
+          ],
         ),
       ),
     );
@@ -1708,6 +1947,7 @@ class _MonthItem {
   final Color dotColor;
   final String rightLabel;
   final Color rightLabelColor;
+  final Color? titleColor;
 
   const _MonthItem({
     required this.date,
@@ -1715,6 +1955,7 @@ class _MonthItem {
     required this.dotColor,
     required this.rightLabel,
     required this.rightLabelColor,
+    this.titleColor,
   });
 }
 
@@ -1735,60 +1976,126 @@ class _MonthlyScheduleSheet extends StatefulWidget {
   State<_MonthlyScheduleSheet> createState() => _MonthlyScheduleSheetState();
 }
 
-class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet> {
-  List<_MonthItem>? _items;
+class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet>
+    with SingleTickerProviderStateMixin {
+  late DateTime _month;
+  List<_MonthItem>? _mySchedules;
+  List<_MonthItem>? _publicHolidays;
+  List<_MonthItem>? _anniversaries;
+  List<_MonthItem>? _allItems;
+  late final TabController _tabController;
 
   static const _weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];
 
   @override
   void initState() {
     super.initState();
+    _month = widget.month;
+    _tabController = TabController(length: 4, vsync: this);
+    _loadItems();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _changeMonth(int delta, {int targetTab = 0}) {
+    setState(() {
+      _month = DateTime(_month.year, _month.month + delta);
+      _mySchedules = null;
+      _publicHolidays = null;
+      _anniversaries = null;
+      _allItems = null;
+    });
+    _tabController.animateTo(targetTab);
     _loadItems();
   }
 
   Future<void> _loadItems() async {
-    final month = widget.month;
-    final ym =
-        '${month.year}-${month.month.toString().padLeft(2, '0')}';
+    final month = _month;
+    final ym = '${month.year}-${month.month.toString().padLeft(2, '0')}';
     final prefix = '$ym-';
 
     final regular = await DatabaseHelper.instance.getSchedulesByMonth(ym);
     final repeats = await DatabaseHelper.instance.getAllRepeatSchedules();
 
-    final items = <_MonthItem>[];
+    final mySchedules = <_MonthItem>[];
+    final publicHolidays = <_MonthItem>[];
+    final anniversaries = <_MonthItem>[];
 
-    // 공휴일·절기·기념일
+    // 공휴일·절기·기념일 분류
     for (final entry in widget.holidays.entries) {
       if (!entry.key.startsWith(prefix)) continue;
       final h = entry.value;
       final date = DateTime.parse(entry.key);
-      items.add(_MonthItem(
+      final item = _MonthItem(
         date: date,
         title: h.name,
         dotColor: _dotColor(h.type),
         rightLabel: _rightLabel(h.type),
         rightLabelColor: _rightColor(h.type),
-      ));
+      );
+      if (h.type == 'rest_day' || h.type == 'national_holiday') {
+        publicHolidays.add(item);
+      } else {
+        anniversaries.add(item);
+      }
     }
 
     // 일반(비반복) 일정
     for (final s in regular) {
       if (s.repeatType != null) continue;
-      items.add(_fromSchedule(s, DateTime.parse(s.solarDate)));
+      mySchedules.add(_fromSchedule(s, DateTime.parse(s.solarDate)));
     }
 
     // 반복 일정
     for (final s in repeats) {
       for (final key
           in RepeatScheduleHelper.datesInMonth(s, month, widget.engine)) {
-        items.add(_fromSchedule(s, DateTime.parse(key)));
+        mySchedules.add(_fromSchedule(s, DateTime.parse(key)));
       }
     }
 
-    items.sort((a, b) => a.date.compareTo(b.date));
+    // 샌드위치 휴일 감지
+    final lastDay = DateTime(month.year, month.month + 1, 0);
+    for (var d = DateTime(month.year, month.month, 1);
+        !d.isAfter(lastDay);
+        d = d.add(const Duration(days: 1))) {
+      if (d.weekday == DateTime.saturday || d.weekday == DateTime.sunday) {
+        continue;
+      }
+      final key =
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      if (widget.holidays.containsKey(key)) continue;
+      if (_isNonWorking(d.subtract(const Duration(days: 1))) &&
+          _isNonWorking(d.add(const Duration(days: 1)))) {
+        publicHolidays.add(_MonthItem(
+          date: d,
+          title: '사잇날',
+          dotColor: const Color(0xFF4FA96A),
+          rightLabel: '',
+          rightLabelColor: Colors.transparent,
+          titleColor: const Color(0xFF4FA96A),
+        ));
+      }
+    }
+
+    mySchedules.sort((a, b) => a.date.compareTo(b.date));
+    publicHolidays.sort((a, b) => a.date.compareTo(b.date));
+    anniversaries.sort((a, b) => a.date.compareTo(b.date));
+
+    final all = [...mySchedules, ...publicHolidays, ...anniversaries]
+      ..sort((a, b) => a.date.compareTo(b.date));
 
     if (!mounted) return;
-    setState(() => _items = items);
+    setState(() {
+      _mySchedules = mySchedules;
+      _publicHolidays = publicHolidays;
+      _anniversaries = anniversaries;
+      _allItems = all;
+    });
   }
 
   static Color _dotColor(String type) => switch (type) {
@@ -1812,6 +2119,16 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet> {
         'anniversary' => const Color(0xFFE9B174),
         _ => const Color(0xFF747B86),
       };
+
+  bool _isNonWorking(DateTime date) {
+    if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
+      return true;
+    }
+    final key =
+        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final h = widget.holidays[key];
+    return h != null && (h.type == 'rest_day' || h.type == 'national_holiday');
+  }
 
   static _MonthItem _fromSchedule(Schedule s, DateTime date) => _MonthItem(
         date: date,
@@ -1844,7 +2161,7 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet> {
       curve: Curves.easeOutCubic,
       padding: EdgeInsets.only(bottom: viewInsets.bottom),
       child: SizedBox(
-        height: size.height * 0.75,
+        height: size.height * 0.90,
         child: Center(
           child: Padding(
             padding: EdgeInsets.symmetric(
@@ -1865,13 +2182,47 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet> {
                     ),
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildHeader(compact),
-                    const Divider(height: 1, color: Color(0xFFEAECEF)),
-                    Expanded(child: _buildList(compact)),
-                  ],
+                child: GestureDetector(
+                  onHorizontalDragEnd: (details) {
+                    final v = details.primaryVelocity ?? 0;
+                    if (v < -300) {
+                      // 우→좌: 다음 탭, 마지막 탭이면 다음 달 첫 탭
+                      final tab = _tabController.index;
+                      if (tab < 3) {
+                        _tabController.animateTo(tab + 1);
+                      } else {
+                        _changeMonth(1, targetTab: 0);
+                      }
+                    } else if (v > 300) {
+                      // 좌→우: 이전 탭, 첫 탭이면 이전 달 마지막 탭
+                      final tab = _tabController.index;
+                      if (tab > 0) {
+                        _tabController.animateTo(tab - 1);
+                      } else {
+                        _changeMonth(-1, targetTab: 3);
+                      }
+                    }
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHeader(compact),
+                      _buildTabBar(compact),
+                      const Divider(height: 1, color: Color(0xFFEAECEF)),
+                      Expanded(
+                        child: TabBarView(
+                          controller: _tabController,
+                          physics: const NeverScrollableScrollPhysics(),
+                          children: [
+                            _buildList(_mySchedules, compact, '이달의 나의 일정이 없습니다'),
+                            _buildList(_publicHolidays, compact, '이달의 공휴일이 없습니다'),
+                            _buildList(_anniversaries, compact, '이달의 기념일·절기가 없습니다'),
+                            _buildList(_allItems, compact, '이달의 일정이 없습니다'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1882,7 +2233,7 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet> {
   }
 
   Widget _buildHeader(bool compact) {
-    final m = widget.month;
+    final m = _month;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         compact ? 20 : 28,
@@ -1915,16 +2266,42 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet> {
     );
   }
 
-  Widget _buildList(bool compact) {
-    final items = _items;
+  Widget _buildTabBar(bool compact) {
+    return TabBar(
+      controller: _tabController,
+      labelStyle: TextStyle(
+        fontFamily: 'Pretendard',
+        fontSize: compact ? 13 : 14,
+        fontWeight: FontWeight.w600,
+      ),
+      unselectedLabelStyle: TextStyle(
+        fontFamily: 'Pretendard',
+        fontSize: compact ? 13 : 14,
+        fontWeight: FontWeight.w400,
+      ),
+      labelColor: const Color(0xFF202124),
+      unselectedLabelColor: const Color(0xFF9EA2A8),
+      indicatorColor: const Color(0xFF3A7272),
+      indicatorWeight: 2,
+      dividerColor: Colors.transparent,
+      tabs: const [
+        Tab(text: '나의 일정'),
+        Tab(text: '공휴일'),
+        Tab(text: '기념일'),
+        Tab(text: '전체'),
+      ],
+    );
+  }
+
+  Widget _buildList(List<_MonthItem>? items, bool compact, String emptyMsg) {
     if (items == null) {
       return const Center(child: CircularProgressIndicator());
     }
     if (items.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
-          '이달의 일정이 없습니다',
-          style: TextStyle(
+          emptyMsg,
+          style: const TextStyle(
             fontFamily: 'Pretendard',
             color: Color(0xFF9EA2A8),
             fontSize: 14,
@@ -1987,7 +2364,7 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet> {
                 fontFamily: 'Pretendard',
                 fontSize: compact ? 13 : 13.5,
                 fontWeight: FontWeight.w600,
-                color: const Color(0xFF202124),
+                color: item.titleColor ?? const Color(0xFF202124),
               ),
               overflow: TextOverflow.ellipsis,
             ),
