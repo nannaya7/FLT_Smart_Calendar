@@ -1,5 +1,5 @@
-import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
 import '../../shared/models/schedule.dart';
 import '../../shared/models/holiday.dart';
 
@@ -125,17 +125,6 @@ class DatabaseHelper {
     return rows.map(Schedule.fromMap).toList();
   }
 
-  /// 음력 매년 반복 일정 전체 반환 (달력 표시 계산용)
-  Future<List<Schedule>> getLunarYearlySchedules() async {
-    final db = await database;
-    final rows = await db.query(
-      tableSchedules,
-      where: 'is_lunar = 1 AND repeat_type = ?',
-      whereArgs: ['yearly'],
-    );
-    return rows.map(Schedule.fromMap).toList();
-  }
-
   /// 반복 타입이 있는 일정 전체 반환
   Future<List<Schedule>> getAllRepeatSchedules() async {
     final db = await database;
@@ -215,17 +204,6 @@ class DatabaseHelper {
       where: "date LIKE ?",
       whereArgs: ['$year-%'],
     );
-  }
-
-  Future<bool> hasHolidaysForYear(int year) async {
-    final db = await database;
-    final count = Sqflite.firstIntValue(
-      await db.rawQuery(
-        'SELECT COUNT(*) FROM $tableHolidays WHERE date LIKE ?',
-        ['$year-%'],
-      ),
-    );
-    return (count ?? 0) > 0;
   }
 
   // ── Utility ─────────────────────────────────────────────────────────────────

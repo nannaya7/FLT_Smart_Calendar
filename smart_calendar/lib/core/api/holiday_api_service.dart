@@ -3,11 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../shared/models/holiday.dart';
 
-/// 공공데이터포털 한국천문연구원 특일 정보 API 래퍼
-///
-/// API 키는 빌드 시 --dart-define 또는 앱 내부 저장소로 등록한다.
-/// 키가 없으면 모든 메서드가 빈 리스트를 반환(앱은 정상 동작).
 class HolidayApiService {
+  final _client = http.Client();
   static const _buildTimeApiKey = String.fromEnvironment(
     'HOLIDAY_API_KEY',
     defaultValue: '',
@@ -79,7 +76,7 @@ class HolidayApiService {
     );
 
     try {
-      final res = await http.get(uri).timeout(const Duration(seconds: 10));
+      final res = await _client.get(uri).timeout(const Duration(seconds: 10));
       if (res.statusCode != 200) return [];
 
       final body = jsonDecode(res.body);

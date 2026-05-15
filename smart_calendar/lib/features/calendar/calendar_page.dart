@@ -112,6 +112,7 @@ class _CalendarPageState extends State<CalendarPage> {
       await Future.wait(
         _monthImages.map((p) => precacheImage(AssetImage(p), context)),
       );
+      if (!mounted) return;
       NotificationService.instance.requestAndroidPermission();
       if (!_apiService.hasBuildTimeApiKey) await _ensureHolidayApiKey();
       await _refreshHolidaysIfNeeded();
@@ -167,32 +168,34 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Future<String?> _showApiKeyDialog() async {
     final ctrl = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('특일 API 키 입력'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: '공공데이터포털 일반 인증키'),
-          minLines: 1,
-          maxLines: 3,
+    try {
+      return await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('특일 API 키 입력'),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: '공공데이터포털 일반 인증키'),
+            minLines: 1,
+            maxLines: 3,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('나중에'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(ctrl.text.trim()),
+              child: const Text('저장'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('나중에'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(ctrl.text.trim()),
-            child: const Text('저장'),
-          ),
-        ],
-      ),
-    );
-    ctrl.dispose();
-    return result;
+      );
+    } finally {
+      ctrl.dispose();
+    }
   }
 
   Future<void> _loadHolidays(int year, {bool forceRefresh = false}) async {
@@ -266,12 +269,9 @@ class _CalendarPageState extends State<CalendarPage> {
   Future<void> _loadMonthBackground(DateTime month) async {
     final prefs = await SharedPreferences.getInstance();
     final path = prefs.getString(_monthBackgroundKey(month.year, month.month));
+    final validPath = (path != null && await File(path).exists()) ? path : null;
     if (!mounted) return;
-    setState(() {
-      _customBackgroundPath = path != null && File(path).existsSync()
-          ? path
-          : null;
-    });
+    setState(() => _customBackgroundPath = validPath);
   }
 
   Future<void> _openBackgroundPicker() async {
@@ -555,9 +555,7 @@ class _CalendarPageState extends State<CalendarPage> {
 
   ImageProvider _heroBackgroundImage() {
     final path = _customBackgroundPath;
-    if (path != null && File(path).existsSync()) {
-      return FileImage(File(path));
-    }
+    if (path != null) return FileImage(File(path));
     return AssetImage(_monthImages[_focusedDay.month - 1]);
   }
 
@@ -709,7 +707,7 @@ class _CalendarPageState extends State<CalendarPage> {
         borderRadius: BorderRadius.circular(16),
         child: TableCalendar(
           firstDay: DateTime.utc(2020, 1, 1),
-          lastDay: DateTime.utc(2030, 12, 31),
+          lastDay: DateTime.utc(DateTime.now().year + 10, 12, 31),
           focusedDay: _focusedDay,
           selectedDayPredicate: (d) => isSameDay(_selectedDay, d),
           onDaySelected: _onDayTap,
@@ -1984,6 +1982,7 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet>
   List<_MonthItem>? _anniversaries;
   List<_MonthItem>? _allItems;
   late final TabController _tabController;
+  late Map<String, Holiday> _sheetHolidays;
 
   static const _weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -1991,6 +1990,7 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet>
   void initState() {
     super.initState();
     _month = widget.month;
+    _sheetHolidays = Map.of(widget.holidays);
     _tabController = TabController(length: 4, vsync: this);
     _loadItems();
   }
@@ -2011,6 +2011,20 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet>
     });
     _tabController.animateTo(targetTab);
     _loadItems();
+    _ensureSheetHolidaysLoaded(_month.year);
+  }
+
+  Future<void> _ensureSheetHolidaysLoaded(int year) async {
+    final prefix = '$year-';
+    if (_sheetHolidays.keys.any((k) => k.startsWith(prefix))) return;
+
+    final holidays = await DatabaseHelper.instance.getHolidaysByYear(year);
+    if (!mounted || holidays.isEmpty) return;
+
+    for (final h in holidays) {
+      Holiday.insertPriority(_sheetHolidays, h);
+    }
+    await _loadItems();
   }
 
   Future<void> _loadItems() async {
@@ -2026,7 +2040,7 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet>
     final anniversaries = <_MonthItem>[];
 
     // 공휴일·절기·기념일 분류
-    for (final entry in widget.holidays.entries) {
+    for (final entry in _sheetHolidays.entries) {
       if (!entry.key.startsWith(prefix)) continue;
       final h = entry.value;
       final date = DateTime.parse(entry.key);
@@ -2068,7 +2082,7 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet>
       }
       final key =
           '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-      if (widget.holidays.containsKey(key)) continue;
+      if (_sheetHolidays.containsKey(key)) continue;
       if (_isNonWorking(d.subtract(const Duration(days: 1))) &&
           _isNonWorking(d.add(const Duration(days: 1)))) {
         publicHolidays.add(_MonthItem(
@@ -2089,7 +2103,7 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet>
     final all = [...mySchedules, ...publicHolidays, ...anniversaries]
       ..sort((a, b) => a.date.compareTo(b.date));
 
-    if (!mounted) return;
+    if (!mounted || month != _month) return;
     setState(() {
       _mySchedules = mySchedules;
       _publicHolidays = publicHolidays;
@@ -2126,7 +2140,7 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet>
     }
     final key =
         '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    final h = widget.holidays[key];
+    final h = _sheetHolidays[key];
     return h != null && (h.type == 'rest_day' || h.type == 'national_holiday');
   }
 
@@ -2142,7 +2156,8 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet>
     if (t == null) return '';
     final parts = t.split(':');
     if (parts.length != 2) return t;
-    final h = int.parse(parts[0]);
+    final h = int.tryParse(parts[0]);
+    if (h == null) return t;
     final m = parts[1];
     if (h == 0) return '오전 12:$m';
     if (h < 12) return '오전 $h:$m';

@@ -61,12 +61,10 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
   bool _repeatExpanded = false;
   int _selectedColor = _palette.first;
 
-  // 일정 추가 카드 전체의 주요 색상입니다. 버튼/선택 상태 색을 바꾸려면 _accent를 수정하세요.
   static const _accent = Color(0xFFFF8999);
   static const _text = Color(0xFF202124);
   static const _muted = Color(0xFF9EA2A8);
   static const _fieldBorder = Color(0xFFE8E1DF);
-  // 색상 선택 팔레트입니다. 저장된 일정 제목의 폰트색으로 사용됩니다.
   static const _palette = [
     0xFFFF8999,
     0xFF83C8AA,
@@ -102,7 +100,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
         orElse: () => _Repeat.none,
       );
     } else {
-      // 새 일정을 열었을 때 기본 시작 시간입니다.
       _startTime = const TimeOfDay(hour: 10, minute: 0);
     }
   }
@@ -284,7 +281,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
     final size = MediaQuery.sizeOf(context);
     final compact = size.width < 390;
 
-    // 키보드가 올라올 때 카드가 자연스럽게 위로 이동하도록 감싸는 영역입니다.
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
@@ -294,16 +290,13 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
         child: Center(
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
-            // 화면 가장자리와 일정 추가 카드 사이의 바깥 여백입니다.
             padding: EdgeInsets.symmetric(
               horizontal: compact ? 16 : 24,
               vertical: 24,
             ),
             child: ConstrainedBox(
-              // 일정 추가 카드의 최대 너비입니다. 큰 화면에서 너무 넓어지는 것을 막습니다.
               constraints: const BoxConstraints(maxWidth: 640),
               child: Container(
-                // 일정 추가 카드 내부 여백입니다. 작은 화면과 큰 화면 값을 따로 둡니다.
                 padding: EdgeInsets.fromLTRB(
                   compact ? 20 : 30,
                   compact ? 20 : 28,
@@ -311,13 +304,10 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                   compact ? 20 : 28,
                 ),
                 decoration: BoxDecoration(
-                  // 일정 추가 카드 배경색과 투명도입니다.
                   color: Colors.white.withValues(alpha: 0.96),
-                  // 일정 추가 카드 모서리 둥글기입니다.
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      // 일정 추가 카드 그림자입니다.
                       color: Colors.black.withValues(alpha: 0.18),
                       blurRadius: 34,
                       offset: const Offset(0, 18),
@@ -328,7 +318,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // 상단 제목과 날짜, 닫기 버튼 영역입니다.
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -361,7 +350,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                       ],
                     ),
                     const SizedBox(height: 22),
-                    // 제목 입력 영역입니다.
                     _formField(
                       label: '제목',
                       child: _plainInput(
@@ -370,22 +358,16 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    // 양력/음력 기준 선택 영역입니다.
                     _calendarModeSelector(),
                     const SizedBox(height: 10),
-                    // 시작 시간 선택 영역입니다.
                     _timeRow(),
                     const SizedBox(height: 10),
-                    // 일정 제목에 적용할 색상 선택 영역입니다.
                     _colorSelector(),
                     const SizedBox(height: 10),
-                    // 반복 주기 선택 영역입니다. 월별/년별 반복도 여기에서 선택합니다.
                     _repeatSelector(),
                     const SizedBox(height: 10),
-                    // 알림 시간 선택 영역입니다.
                     _alarmSelector(),
                     const SizedBox(height: 10),
-                    // 내용 입력 영역입니다.
                     _formField(
                       label: '내용',
                       minHeight: 92,
@@ -397,7 +379,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                       ),
                     ),
                     const SizedBox(height: 22),
-                    // 하단 취소/저장 버튼 영역입니다.
                     Row(
                       children: [
                         Expanded(
@@ -429,9 +410,7 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
 
   Widget _timeRow() {
     return Container(
-      // 시간 입력 박스의 최소 높이입니다.
       constraints: const BoxConstraints(minHeight: 48),
-      // 시간 입력 박스 내부 여백입니다.
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -448,7 +427,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
       child: Row(
         children: [
           const SizedBox(
-            // 왼쪽 라벨 영역 너비입니다. 제목/날짜/내용 입력칸과 맞추려면 이 값을 조절하세요.
             width: 78,
             child: Text(
               '시간',
@@ -475,7 +453,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
     return Row(
       children: [
         const SizedBox(
-          // 기준 라벨 영역 너비입니다. 다른 행의 라벨 너비와 맞추는 값입니다.
           width: 94,
           child: Padding(
             padding: EdgeInsets.only(left: 15),
@@ -492,7 +469,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
         ),
         Expanded(
           child: Container(
-            // 양력/음력 선택 컨트롤 높이입니다.
             height: 38,
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
@@ -531,7 +507,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        // 양력/음력 선택 시 배경 전환 속도입니다.
         duration: const Duration(milliseconds: 160),
         alignment: Alignment.center,
         decoration: BoxDecoration(
@@ -568,9 +543,7 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
         borderRadius: BorderRadius.circular(10),
         onTap: onTap,
         child: Container(
-          // 시간 버튼 높이입니다.
           height: 36,
-          // 시간 버튼 내부 좌우 여백입니다.
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(
             children: [
@@ -614,9 +587,7 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Container(
-          // 공통 입력 박스의 최소 높이입니다.
           constraints: BoxConstraints(minHeight: minHeight),
-          // 공통 입력 박스 내부 여백입니다.
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
@@ -635,7 +606,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                 : CrossAxisAlignment.center,
             children: [
               SizedBox(
-                // 공통 입력 박스 왼쪽 라벨 영역 너비입니다.
                 width: 78,
                 child: Text(
                   label,
@@ -667,7 +637,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
       controller: controller,
       maxLines: maxLines,
       style: const TextStyle(
-        // 입력 텍스트 폰트 크기입니다.
         fontFamily: 'Pretendard',
         fontSize: 16,
         color: _text,
@@ -690,7 +659,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
     return Row(
       children: [
         const SizedBox(
-          // 색상 라벨 영역 너비입니다.
           width: 94,
           child: Padding(
             padding: EdgeInsets.only(left: 15),
@@ -707,7 +675,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
         ),
         Expanded(
           child: Wrap(
-            // 색상 원 사이의 가로/세로 간격입니다.
             spacing: 14,
             runSpacing: 8,
             children: _palette.map((color) {
@@ -715,9 +682,7 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
               return GestureDetector(
                 onTap: () => setState(() => _selectedColor = color),
                 child: AnimatedContainer(
-                  // 색상 원 선택 애니메이션 속도입니다.
                   duration: const Duration(milliseconds: 160),
-                  // 색상 원 크기입니다.
                   width: 26,
                   height: 26,
                   decoration: BoxDecoration(
@@ -732,7 +697,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                     ],
                   ),
                   child: selected
-                      // 선택된 색상에 표시되는 체크 아이콘입니다.
                       ? const Icon(Icons.check, color: Colors.white, size: 18)
                       : null,
                 ),
@@ -822,13 +786,13 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
   Widget _alarmOption(_Alarm a) {
     final selected = _alarm == a;
     final icon = switch (a) {
-      _Alarm.none  => Icons.notifications_off_outlined,
+      _Alarm.none => Icons.notifications_off_outlined,
       _Alarm.onTime => Icons.notifications_outlined,
-      _Alarm.ten   => Icons.alarm,
+      _Alarm.ten => Icons.alarm,
       _Alarm.fifteen => Icons.alarm,
       _Alarm.thirty => Icons.alarm,
-      _Alarm.hour  => Icons.alarm,
-      _Alarm.day   => Icons.wb_twilight,
+      _Alarm.hour => Icons.alarm,
+      _Alarm.day => Icons.wb_twilight,
     };
     return InkWell(
       onTap: () => setState(() {
@@ -937,11 +901,11 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
   Widget _repeatOption(_Repeat r) {
     final selected = _repeat == r;
     final icon = switch (r) {
-      _Repeat.none    => Icons.remove_circle_outline,
-      _Repeat.daily   => Icons.loop,
-      _Repeat.weekly  => Icons.date_range,
+      _Repeat.none => Icons.remove_circle_outline,
+      _Repeat.daily => Icons.loop,
+      _Repeat.weekly => Icons.date_range,
       _Repeat.monthly => Icons.calendar_month,
-      _Repeat.yearly  => Icons.event_repeat,
+      _Repeat.yearly => Icons.event_repeat,
     };
     return InkWell(
       onTap: () => setState(() {
@@ -978,7 +942,6 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
     required bool filled,
   }) {
     return SizedBox(
-      // 취소/저장 버튼 높이입니다.
       height: 58,
       child: ElevatedButton(
         onPressed: onTap,

@@ -16,20 +16,25 @@ abstract final class RepeatScheduleHelper {
     CalendarEngine engine,
   ) {
     final reg = DateTime.parse(s.solarDate);
+    final startDay = DateTime(reg.year, reg.month, reg.day);
     switch (s.repeatType) {
       case 'daily':
         final days = _daysInMonth(month.year, month.month);
-        return List.generate(
-          days,
-          (i) => _dateKey(DateTime(month.year, month.month, i + 1)),
-        );
+        final result = <String>[];
+        for (int i = 1; i <= days; i++) {
+          final date = DateTime(month.year, month.month, i);
+          if (!date.isBefore(startDay)) result.add(_dateKey(date));
+        }
+        return result;
       case 'weekly':
         final weekday = reg.weekday;
         final totalDays = _daysInMonth(month.year, month.month);
         final result = <String>[];
         for (int d = 1; d <= totalDays; d++) {
           final date = DateTime(month.year, month.month, d);
-          if (date.weekday == weekday) result.add(_dateKey(date));
+          if (date.weekday == weekday && !date.isBefore(startDay)) {
+            result.add(_dateKey(date));
+          }
         }
         return result;
       case 'monthly':
@@ -68,11 +73,12 @@ abstract final class RepeatScheduleHelper {
   /// 반복 일정 [s]가 특정 날짜 [day]에 해당하는지 반환한다.
   static bool matchesDay(Schedule s, DateTime day, CalendarEngine engine) {
     final reg = DateTime.parse(s.solarDate);
+    final startDay = DateTime(reg.year, reg.month, reg.day);
     switch (s.repeatType) {
       case 'daily':
-        return true;
+        return !day.isBefore(startDay);
       case 'weekly':
-        return day.weekday == reg.weekday;
+        return day.weekday == reg.weekday && !day.isBefore(startDay);
       case 'monthly':
         if (s.isLunar) {
           if (s.lunarDay == null) return false;
