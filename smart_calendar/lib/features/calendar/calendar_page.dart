@@ -1946,6 +1946,7 @@ class _MonthItem {
   final String rightLabel;
   final Color rightLabelColor;
   final Color? titleColor;
+  final bool isLunar;
 
   const _MonthItem({
     required this.date,
@@ -1954,6 +1955,7 @@ class _MonthItem {
     required this.rightLabel,
     required this.rightLabelColor,
     this.titleColor,
+    this.isLunar = false,
   });
 }
 
@@ -2150,6 +2152,7 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet>
         dotColor: Color(s.categoryColor),
         rightLabel: _fmtTime(s.time),
         rightLabelColor: const Color(0xFF747B86),
+        isLunar: s.isLunar,
       );
 
   static String _fmtTime(String? t) {
@@ -2384,6 +2387,25 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet>
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          if (item.isLunar) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: const Color(0xFFB8920A).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '음력',
+                style: TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: compact ? 9 : 10,
+                  color: const Color(0xFFB8920A),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
           if (item.rightLabel.isNotEmpty) ...[
             const SizedBox(width: 8),
             Text(
