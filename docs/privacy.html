@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>개인정보 처리방침 — 스마트 하이브리드 달력</title>
+  <style>
+    :root {
+      --bg: #1a2e2e;
+      --card: #22403f;
+      --accent: #e8c090;
+      --text: #f0ebe3;
+      --muted: #a09080;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      line-height: 1.8;
+    }
+
+    header {
+      background: linear-gradient(160deg, #2c4a4a 0%, #1a2e2e 100%);
+      border-bottom: 1px solid #3a5a5a;
+      padding: 40px 24px 32px;
+      text-align: center;
+    }
+    header a {
+      display: inline-block;
+      margin-bottom: 16px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    header a:hover { color: var(--accent); }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+    header .meta { color: var(--muted); font-size: 0.85rem; margin-top: 8px; }
+
+    main { max-width: 720px; margin: 0 auto; padding: 48px 24px 64px; }
+
+    .notice {
+      background: rgba(232, 192, 144, 0.1);
+      border: 1px solid rgba(232, 192, 144, 0.3);
+      border-radius: 12px;
+      padding: 16px 20px;
+      font-size: 0.9rem;
+      color: var(--accent);
+      margin-bottom: 40px;
+    }
+
+    section { margin-bottom: 40px; }
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #3a5a5a;
+    }
+    p { font-size: 0.93rem; color: var(--text); margin-bottom: 10px; }
+    ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 0.93rem;
+    }
+    ul li { display: flex; gap: 10px; }
+    ul li::before { content: "•"; color: var(--accent); flex-shrink: 0; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin-top: 10px;
+    }
+    th {
+      background: #2a4a4a;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--accent);
+      border: 1px solid #3a5a5a;
+    }
+    td {
+      padding: 10px 14px;
+      border: 1px solid #3a5a5a;
+      color: var(--text);
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
+
+    .highlight {
+      background: rgba(128, 224, 128, 0.08);
+      border-left: 3px solid #80e080;
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      font-size: 0.9rem;
+      margin-top: 10px;
+    }
+
+    footer {
+      background: #111e1e;
+      border-top: 1px solid #2a4040;
+      padding: 28px 24px;
+      text-align: center;
+    }
+    footer .links { display: flex; gap: 20px; justify-content: center; margin-bottom: 12px; flex-wrap: wrap; }
+    footer a { color: var(--accent); text-decoration: none; font-size: 0.9rem; }
+    footer a:hover { text-decoration: underline; }
+    footer .copy { color: var(--muted); font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="index.html">← 앱 홈으로</a>
+  <h1>개인정보 처리방침</h1>
+  <p class="meta">스마트 하이브리드 달력 &nbsp;|&nbsp; 최종 업데이트: 2026년 5월 7일</p>
+</header>
+
+<main>
+
+  <div class="notice">
+    본 앱은 사용자의 개인정보를 수집·저장·전송하지 않습니다.
+    모든 일정 데이터는 기기 내부에만 저장됩니다.
+  </div>
+
+  <!-- 1 -->
+  <section>
+    <h2>제1조 (개인정보의 수집 및 이용 목적)</h2>
+    <p>스마트 하이브리드 달력(이하 "앱")은 개인식별 정보를 수집하지 않습니다. 앱은 사용자가 직접 입력한 일정(제목, 메모, 날짜, 시간)을 기기 내부 데이터베이스에만 저장하며, 해당 데이터는 외부 서버, 클라우드 또는 제3자에게 전송되지 않습니다.</p>
+  </section>
+
+  <!-- 2 -->
+  <section>
+    <h2>제2조 (수집하는 정보의 항목 및 보유 기간)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>항목</th>
+          <th>수집 주체</th>
+          <th>저장 위치</th>
+          <th>보유 기간</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>일정 데이터<br><span style="color:#a09080;font-size:0.82rem;">(제목, 메모, 날짜, 시간, 알림 설정)</span></td>
+          <td>사용자 직접 입력</td>
+          <td>기기 내부 (SQLite)</td>
+          <td>앱 삭제 시까지</td>
+        </tr>
+        <tr>
+          <td>배경 이미지</td>
+          <td>사용자 직접 선택</td>
+          <td>기기 내부 (앱 문서 폴더)</td>
+          <td>앱 삭제 시까지</td>
+        </tr>
+        <tr>
+          <td>API 키<br><span style="color:#a09080;font-size:0.82rem;">(공공데이터포털, 선택 입력)</span></td>
+          <td>사용자 직접 입력</td>
+          <td>기기 내부 (SharedPreferences)</td>
+          <td>사용자가 삭제하거나 앱 삭제 시까지</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="highlight">
+      앱은 사용자 계정, 위치 정보, 연락처, 카메라 이미지(갤러리 선택 외), 식별자(IDFA, GAID 등)를 수집하지 않습니다.
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section>
+    <h2>제3조 (제3자 서비스 이용)</h2>
+    <p>앱은 공휴일·24절기 정보 제공을 위해 아래 외부 API를 사용합니다. 해당 API 요청에는 개인식별 정보가 포함되지 않습니다.</p>
+    <ul>
+      <li>
+        <div>
+          <strong>공공데이터포털 — 한국천문연구원 특일 정보 서비스</strong><br>
+          <span style="color:var(--muted);font-size:0.85rem;">
+            연도별 공휴일·기념일·24절기 데이터를 조회합니다. 요청 시 사용자 API 키가 URL 파라미터로 포함되나, 개인정보는 전송되지 않습니다.<br>
+            운영 기관 개인정보처리방침: <a href="https://www.data.go.kr/info/privacyInfo.do" target="_blank" rel="noopener" style="color:var(--accent);">data.go.kr</a>
+          </span>
+        </div>
+      </li>
+    </ul>
+    <p style="margin-top:14px;">광고 네트워크, 행동 분석 SDK, 외부 크래시 리포팅 도구는 사용하지 않습니다.</p>
+  </section>
+
+  <!-- 4 -->
+  <section>
+    <h2>제4조 (알림 권한)</h2>
+    <p>앱은 사용자가 설정한 일정 알림을 전송하기 위해 기기 알림 권한을 요청합니다. 알림은 기기 로컬에서만 생성되며 외부 서버를 경유하지 않습니다. 알림 권한을 거부하면 일정 알림 기능만 비활성화되고 그 외 기능은 정상 동작합니다.</p>
+  </section>
+
+  <!-- 5 -->
+  <section>
+    <h2>제5조 (갤러리 접근 권한)</h2>
+    <p>배경 이미지 교체 기능 사용 시 사진 라이브러리 접근 권한을 요청합니다. 선택한 이미지는 앱 내부 폴더에 복사되어 저장되며, 외부로 전송되지 않습니다. 권한을 거부하면 배경 이미지 교체 기능만 비활성화됩니다.</p>
+  </section>
+
+  <!-- 6 -->
+  <section>
+    <h2>제6조 (아동의 개인정보 보호)</h2>
+    <p>앱은 만 14세 미만 아동으로부터 의도적으로 개인정보를 수집하지 않습니다. 앱 자체적으로 개인정보를 수집하지 않으므로 연령 제한 없이 사용할 수 있습니다.</p>
+  </section>
+
+  <!-- 7 -->
+  <section>
+    <h2>제7조 (이용자의 권리)</h2>
+    <ul>
+      <li>앱 내 일정 데이터는 언제든지 삭제할 수 있습니다.</li>
+      <li>앱을 삭제하면 기기에 저장된 모든 데이터(일정, 배경 이미지, API 키)가 함께 삭제됩니다.</li>
+      <li>개인정보 처리방침 관련 문의는 아래 이메일로 연락하시기 바랍니다.</li>
+    </ul>
+  </section>
+
+  <!-- 8 -->
+  <section>
+    <h2>제8조 (개인정보 보호 책임자 및 문의처)</h2>
+    <table>
+      <tbody>
+        <tr>
+          <td style="width:140px; color:var(--muted);">개인정보 보호 책임자</td>
+          <td>nannaya7</td>
+        </tr>
+        <tr>
+          <td style="color:var(--muted);">이메일</td>
+          <td><a href="mailto:nannaya7@gmail.com" style="color:var(--accent);">nannaya7@gmail.com</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 9 -->
+  <section>
+    <h2>제9조 (개인정보 처리방침의 변경)</h2>
+    <p>본 방침은 법령 또는 앱 기능 변경 시 개정될 수 있습니다. 변경 사항은 이 페이지에 게시되며, 중요한 변경의 경우 앱 업데이트 노트를 통해 안내합니다.</p>
+    <p>현행 방침 시행일: <strong>2026년 5월 7일</strong></p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="links">
+    <a href="index.html">홈</a>
+    <a href="privacy.html">개인정보 처리방침</a>
+    <a href="mailto:nannaya7@gmail.com">문의</a>
+  </div>
+  <p class="copy">© 2026 nannaya7. All rights reserved.</p>
+</footer>
+
+</body>
+</html>
