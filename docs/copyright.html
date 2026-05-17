@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>저작권 및 라이선스 — 스마트 하이브리드 달력</title>
+  <style>
+    :root {
+      --bg: #1a2e2e;
+      --card: #22403f;
+      --accent: #e8c090;
+      --text: #f0ebe3;
+      --muted: #a09080;
+      --green: #80e080;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      line-height: 1.8;
+    }
+
+    header {
+      background: linear-gradient(160deg, #2c4a4a 0%, #1a2e2e 100%);
+      border-bottom: 1px solid #3a5a5a;
+      padding: 40px 24px 32px;
+      text-align: center;
+    }
+    header a {
+      display: inline-block;
+      margin-bottom: 16px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    header a:hover { color: var(--accent); }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+    header .meta { color: var(--muted); font-size: 0.85rem; margin-top: 8px; }
+
+    main { max-width: 720px; margin: 0 auto; padding: 48px 24px 64px; }
+
+    /* App copyright banner */
+    .copyright-banner {
+      background: linear-gradient(135deg, #2c4a4a, #1e3838);
+      border: 1px solid #3a5a5a;
+      border-radius: 16px;
+      padding: 28px 28px;
+      margin-bottom: 40px;
+      text-align: center;
+    }
+    .copyright-banner .symbol {
+      font-size: 2.4rem;
+      margin-bottom: 10px;
+    }
+    .copyright-banner h2 {
+      font-size: 1.2rem;
+      color: var(--accent);
+      font-weight: 700;
+      border: none;
+      margin-bottom: 8px;
+      padding: 0;
+    }
+    .copyright-banner p {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .copyright-banner .statement {
+      margin-top: 16px;
+      font-size: 1rem;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    section { margin-bottom: 44px; }
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #3a5a5a;
+    }
+    p { font-size: 0.93rem; color: var(--text); margin-bottom: 10px; }
+
+    /* License table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.87rem;
+      margin-top: 10px;
+    }
+    th {
+      background: #2a4a4a;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--accent);
+      border: 1px solid #3a5a5a;
+    }
+    td {
+      padding: 10px 14px;
+      border: 1px solid #3a5a5a;
+      color: var(--text);
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
+    td a { color: var(--accent); text-decoration: none; }
+    td a:hover { text-decoration: underline; }
+
+    .license-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: rgba(232,192,144,0.15);
+      color: var(--accent);
+      border: 1px solid rgba(232,192,144,0.3);
+      white-space: nowrap;
+    }
+    .license-tag.mit    { background: rgba(128,224,128,0.1); color: #80e080; border-color: rgba(128,224,128,0.3); }
+    .license-tag.bsd    { background: rgba(112,168,255,0.1); color: #70a8ff; border-color: rgba(112,168,255,0.3); }
+    .license-tag.apache { background: rgba(255,170,136,0.1); color: #ffaa88; border-color: rgba(255,170,136,0.3); }
+    .license-tag.ofl    { background: rgba(232,192,144,0.1); color: var(--accent); border-color: rgba(232,192,144,0.3); }
+    .license-tag.cc     { background: rgba(200,200,200,0.1); color: #c8c8c8; border-color: rgba(200,200,200,0.3); }
+
+    .notice-box {
+      background: rgba(128,224,128,0.08);
+      border: 1px solid rgba(128,224,128,0.25);
+      border-radius: 10px;
+      padding: 16px 18px;
+      font-size: 0.88rem;
+      color: var(--green);
+      margin-top: 14px;
+    }
+
+    ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    ul li { display: flex; gap: 10px; font-size: 0.9rem; }
+    ul li::before { content: "•"; color: var(--accent); flex-shrink: 0; }
+
+    footer {
+      background: #111e1e;
+      border-top: 1px solid #2a4040;
+      padding: 28px 24px;
+      text-align: center;
+    }
+    footer .links { display: flex; gap: 20px; justify-content: center; margin-bottom: 12px; flex-wrap: wrap; }
+    footer a { color: var(--accent); text-decoration: none; font-size: 0.9rem; }
+    footer a:hover { text-decoration: underline; }
+    footer .copy { color: var(--muted); font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="index.html">← 앱 홈으로</a>
+  <h1>저작권 및 라이선스</h1>
+  <p class="meta">스마트 하이브리드 달력 &nbsp;|&nbsp; Copyright &amp; Licenses</p>
+</header>
+
+<main>
+
+  <!-- 앱 저작권 -->
+  <div class="copyright-banner">
+    <div class="symbol">©</div>
+    <h2>앱 저작권</h2>
+    <p class="statement">Copyright © 2026 nannaya7. All rights reserved.</p>
+    <p style="margin-top:12px;">
+      본 앱의 소스 코드, UI 디자인, 그래픽 리소스, 문서 일체는 저작권법의 보호를 받습니다.<br>
+      사전 서면 동의 없이 복제, 배포, 2차 저작물 작성을 금합니다.
+    </p>
+  </div>
+
+  <!-- 오픈소스 라이브러리 -->
+  <section>
+    <h2>오픈소스 라이브러리</h2>
+    <p>본 앱은 아래 오픈소스 패키지를 사용합니다. 각 패키지의 저작권은 원 저작자에게 있습니다.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>패키지</th>
+          <th>라이선스</th>
+          <th>pub.dev</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Flutter SDK</strong><br><span style="color:var(--muted);font-size:0.82rem;">Google LLC</span></td>
+          <td><span class="license-tag bsd">BSD 3-Clause</span></td>
+          <td><a href="https://flutter.dev" target="_blank" rel="noopener">flutter.dev</a></td>
+        </tr>
+        <tr>
+          <td><strong>sqflite</strong><br><span style="color:var(--muted);font-size:0.82rem;">로컬 SQLite DB</span></td>
+          <td><span class="license-tag bsd">BSD 2-Clause</span></td>
+          <td><a href="https://pub.dev/packages/sqflite" target="_blank" rel="noopener">pub.dev</a></td>
+        </tr>
+        <tr>
+          <td><strong>table_calendar</strong><br><span style="color:var(--muted);font-size:0.82rem;">달력 UI 위젯</span></td>
+          <td><span class="license-tag apache">Apache 2.0</span></td>
+          <td><a href="https://pub.dev/packages/table_calendar" target="_blank" rel="noopener">pub.dev</a></td>
+        </tr>
+        <tr>
+          <td><strong>korean_lunar_utils</strong><br><span style="color:var(--muted);font-size:0.82rem;">한국 음력 변환</span></td>
+          <td><span class="license-tag mit">MIT</span></td>
+          <td><a href="https://pub.dev/packages/korean_lunar_utils" target="_blank" rel="noopener">pub.dev</a></td>
+        </tr>
+        <tr>
+          <td><strong>flutter_local_notifications</strong><br><span style="color:var(--muted);font-size:0.82rem;">로컬 푸시 알림</span></td>
+          <td><span class="license-tag bsd">BSD 3-Clause</span></td>
+          <td><a href="https://pub.dev/packages/flutter_local_notifications" target="_blank" rel="noopener">pub.dev</a></td>
+        </tr>
+        <tr>
+          <td><strong>timezone</strong><br><span style="color:var(--muted);font-size:0.82rem;">시간대 처리</span></td>
+          <td><span class="license-tag mit">MIT</span></td>
+          <td><a href="https://pub.dev/packages/timezone" target="_blank" rel="noopener">pub.dev</a></td>
+        </tr>
+        <tr>
+          <td><strong>http</strong><br><span style="color:var(--muted);font-size:0.82rem;">HTTP 클라이언트</span></td>
+          <td><span class="license-tag bsd">BSD 3-Clause</span></td>
+          <td><a href="https://pub.dev/packages/http" target="_blank" rel="noopener">pub.dev</a></td>
+        </tr>
+        <tr>
+          <td><strong>flutter_slidable</strong><br><span style="color:var(--muted);font-size:0.82rem;">스와이프 액션</span></td>
+          <td><span class="license-tag mit">MIT</span></td>
+          <td><a href="https://pub.dev/packages/flutter_slidable" target="_blank" rel="noopener">pub.dev</a></td>
+        </tr>
+        <tr>
+          <td><strong>shared_preferences</strong><br><span style="color:var(--muted);font-size:0.82rem;">로컬 설정 저장</span></td>
+          <td><span class="license-tag bsd">BSD 3-Clause</span></td>
+          <td><a href="https://pub.dev/packages/shared_preferences" target="_blank" rel="noopener">pub.dev</a></td>
+        </tr>
+        <tr>
+          <td><strong>image_picker</strong><br><span style="color:var(--muted);font-size:0.82rem;">갤러리 이미지 선택</span></td>
+          <td><span class="license-tag apache">Apache 2.0</span></td>
+          <td><a href="https://pub.dev/packages/image_picker" target="_blank" rel="noopener">pub.dev</a></td>
+        </tr>
+        <tr>
+          <td><strong>path_provider</strong><br><span style="color:var(--muted);font-size:0.82rem;">파일 경로 접근</span></td>
+          <td><span class="license-tag bsd">BSD 3-Clause</span></td>
+          <td><a href="https://pub.dev/packages/path_provider" target="_blank" rel="noopener">pub.dev</a></td>
+        </tr>
+        <tr>
+          <td><strong>path</strong><br><span style="color:var(--muted);font-size:0.82rem;">경로 문자열 조작</span></td>
+          <td><span class="license-tag bsd">BSD 3-Clause</span></td>
+          <td><a href="https://pub.dev/packages/path" target="_blank" rel="noopener">pub.dev</a></td>
+        </tr>
+        <tr>
+          <td><strong>cupertino_icons</strong><br><span style="color:var(--muted);font-size:0.82rem;">iOS 스타일 아이콘</span></td>
+          <td><span class="license-tag mit">MIT</span></td>
+          <td><a href="https://pub.dev/packages/cupertino_icons" target="_blank" rel="noopener">pub.dev</a></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="notice-box">
+      앱 내에서 전체 오픈소스 라이선스 고지는 설정 화면의 "오픈소스 라이선스" 항목에서 확인할 수 있습니다.
+    </div>
+  </section>
+
+  <!-- 폰트 라이선스 -->
+  <section>
+    <h2>폰트 라이선스</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>폰트</th>
+          <th>제작</th>
+          <th>라이선스</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Pretendard</strong></td>
+          <td>Kil Hyung-jin (길형진)</td>
+          <td><span class="license-tag ofl">SIL OFL 1.1</span></td>
+        </tr>
+        <tr>
+          <td><strong>Inter</strong></td>
+          <td>Rasmus Andersson</td>
+          <td><span class="license-tag ofl">SIL OFL 1.1</span></td>
+        </tr>
+        <tr>
+          <td><strong>Space Grotesk</strong></td>
+          <td>Florian Karsten</td>
+          <td><span class="license-tag ofl">SIL OFL 1.1</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top:12px;font-size:0.88rem;color:var(--muted);">
+      SIL Open Font License 1.1은 폰트의 자유로운 사용, 수정, 재배포를 허용합니다.
+      단, 폰트 자체를 단독 판매하는 것은 금지됩니다.
+    </p>
+  </section>
+
+  <!-- 공공데이터 -->
+  <section>
+    <h2>공공데이터 이용 고지</h2>
+    <p>본 앱은 공공데이터포털을 통해 제공되는 데이터를 활용합니다.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>데이터</th>
+          <th>제공 기관</th>
+          <th>이용 조건</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <strong>특일 정보 (공휴일·기념일·24절기)</strong><br>
+            <span style="color:var(--muted);font-size:0.82rem;">getHoliDeInfo, getAnniversaryInfo, get24DivisionsInfo, getRestDeInfo</span>
+          </td>
+          <td>한국천문연구원<br><a href="https://www.data.go.kr" target="_blank" rel="noopener" style="font-size:0.82rem;">data.go.kr</a></td>
+          <td><span class="license-tag cc">공공누리 제1유형</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="notice-box">
+      공공누리 제1유형: 출처 표시 조건 하에 자유로운 이용·수정·재배포 가능.<br>
+      출처: 공공데이터포털 / 한국천문연구원 특일 정보 서비스
+    </div>
+  </section>
+
+  <!-- 상표 -->
+  <section>
+    <h2>상표 및 면책 고지</h2>
+    <ul>
+      <li>Apple, App Store, iOS는 Apple Inc.의 등록 상표입니다.</li>
+      <li>Android, Google Play는 Google LLC의 등록 상표입니다.</li>
+      <li>위 상표는 각 플랫폼에서의 앱 배포를 설명하기 위한 목적으로만 사용되며, 해당 회사와의 제휴·보증 관계를 의미하지 않습니다.</li>
+      <li>본 앱은 공공데이터포털의 공식 앱이 아닙니다. 특일 데이터 오류는 공공데이터포털 원본 데이터 기준을 따릅니다.</li>
+    </ul>
+  </section>
+
+  <!-- 문의 -->
+  <section>
+    <h2>저작권 문의</h2>
+    <p>저작권 관련 문의는 아래 이메일로 연락해 주세요.</p>
+    <p><a href="mailto:nannaya7@gmail.com" style="color:var(--accent);">nannaya7@gmail.com</a></p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="links">
+    <a href="index.html">홈</a>
+    <a href="privacy.html">개인정보 처리방침</a>
+    <a href="copyright.html">저작권</a>
+    <a href="mailto:nannaya7@gmail.com">문의</a>
+  </div>
+  <p class="copy">© 2026 nannaya7. All rights reserved.</p>
+</footer>
+
+</body>
+</html>
