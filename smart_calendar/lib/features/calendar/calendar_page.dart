@@ -1947,6 +1947,7 @@ class _MonthItem {
   final Color rightLabelColor;
   final Color? titleColor;
   final bool isLunar;
+  final String lunarLabel;
 
   const _MonthItem({
     required this.date,
@@ -1956,6 +1957,7 @@ class _MonthItem {
     required this.rightLabelColor,
     this.titleColor,
     this.isLunar = false,
+    this.lunarLabel = '',
   });
 }
 
@@ -2063,14 +2065,14 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet>
     // 일반(비반복) 일정
     for (final s in regular) {
       if (s.repeatType != null) continue;
-      mySchedules.add(_fromSchedule(s, DateTime.parse(s.solarDate)));
+      mySchedules.add(_fromSchedule(s, DateTime.parse(s.solarDate), widget.engine));
     }
 
     // 반복 일정
     for (final s in repeats) {
       for (final key
           in RepeatScheduleHelper.datesInMonth(s, month, widget.engine)) {
-        mySchedules.add(_fromSchedule(s, DateTime.parse(key)));
+        mySchedules.add(_fromSchedule(s, DateTime.parse(key), widget.engine));
       }
     }
 
@@ -2146,14 +2148,26 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet>
     return h != null && (h.type == 'rest_day' || h.type == 'national_holiday');
   }
 
-  static _MonthItem _fromSchedule(Schedule s, DateTime date) => _MonthItem(
-        date: date,
-        title: s.title,
-        dotColor: Color(s.categoryColor),
-        rightLabel: _fmtTime(s.time),
-        rightLabelColor: const Color(0xFF747B86),
-        isLunar: s.isLunar,
-      );
+  static _MonthItem _fromSchedule(
+    Schedule s,
+    DateTime date,
+    CalendarEngine engine,
+  ) {
+    String lunarLabel = '';
+    if (s.isLunar) {
+      final lunar = engine.solarToLunar(date);
+      lunarLabel = '음${lunar.month}.${lunar.day}';
+    }
+    return _MonthItem(
+      date: date,
+      title: s.title,
+      dotColor: Color(s.categoryColor),
+      rightLabel: _fmtTime(s.time),
+      rightLabelColor: const Color(0xFF747B86),
+      isLunar: s.isLunar,
+      lunarLabel: lunarLabel,
+    );
+  }
 
   static String _fmtTime(String? t) {
     if (t == null) return '';
@@ -2396,10 +2410,10 @@ class _MonthlyScheduleSheetState extends State<_MonthlyScheduleSheet>
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                '음력',
+                item.lunarLabel.isNotEmpty ? '(${item.lunarLabel})' : '음력',
                 style: TextStyle(
                   fontFamily: 'Pretendard',
-                  fontSize: compact ? 9 : 10,
+                  fontSize: compact ? 13 : 13.5,
                   color: const Color(0xFFB8920A),
                   fontWeight: FontWeight.w600,
                 ),
