@@ -36,7 +36,9 @@
 - 날짜 탭 → 하단 인라인 패널에서 일정 목록 확인 및 추가/수정
 - 패널 헤더에 양력·음력 날짜 동시 표기, 절기·명절 서브텍스트 표시
 - 일정 추가/수정 폼 헤더에 선택 날짜(양력·음력) 동시 표시 — 녹색 볼드 폰트
-- 일정 항목: 제목, 메모, 시간, 알림 설정, 반복 유형, 양력/음력 구분, 카테고리 색상 (5색)
+- 일정 항목: 제목, 이모지, 메모, 시간, 알림 설정, 반복 유형, 양력/음력 구분, 카테고리 색상 (5색)
+- 이모지 등록 일정은 달력 셀 서브텍스트 위치에 일정 제목 표시
+- 일정 목록 내 꾹 눌러서 순서 변경 (display_order DB 저장)
 - 반복·알림 설정: 인라인 확장 리스트 UI (`AnimatedSize` + `AnimatedRotation` 토글)
 - 시간 선택: 앱 테마(핑크 accent) 맞춤 클락 다이얼 피커 (AM/PM, 한국어 버튼)
 - 스와이프(→) 액션으로 일정 수정(파랑) / 삭제(빨강)
@@ -122,12 +124,13 @@ lib/
 
 ---
 
-## DB 스키마 (v5)
+## DB 스키마 (v7)
 
 ```sql
 CREATE TABLE schedules (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     title                 TEXT    NOT NULL,
+    emoji                 TEXT,               -- 이모지 문자 (달력 셀 표시용)
     memo                  TEXT,
     solar_date            TEXT    NOT NULL,   -- YYYY-MM-DD (양력 기준)
     time                  TEXT,               -- HH:mm
@@ -138,7 +141,8 @@ CREATE TABLE schedules (
     category_color        INTEGER DEFAULT 0xFF2196F3,
     repeat_type           TEXT,               -- null | 'daily' | 'monthly' | 'yearly'
     lunar_month           INTEGER,            -- is_lunar=1 일 때 음력 월
-    lunar_day             INTEGER             -- is_lunar=1 일 때 음력 일
+    lunar_day             INTEGER,            -- is_lunar=1 일 때 음력 일
+    display_order         INTEGER             -- 날짜 내 정렬 순서 (꾹 눌러 변경)
 );
 
 CREATE TABLE holidays (
@@ -148,6 +152,8 @@ CREATE TABLE holidays (
     type  TEXT NOT NULL   -- anniversary | rest_day | national_holiday | solar_term
 );
 ```
+
+마이그레이션 경로: v1→v2(holidays), v2→v3(repeat_type), v3→v4(lunar_month/day), v4→v5(end_time/location), v5→v6(emoji), v6→v7(display_order)
 
 ---
 

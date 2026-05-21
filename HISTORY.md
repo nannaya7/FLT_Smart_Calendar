@@ -1,5 +1,58 @@
 # 개발 히스토리
 
+## V.0.30.200 — 2026-05-21
+
+### App Store 배포 준비 (v1.0.2)
+
+#### 버전 업데이트
+- `pubspec.yaml` version: `1.0.0+1` → `1.0.2+2`
+- `Xcode project.pbxproj` MARKETING_VERSION: `1.0` → `1.0.2` (Debug/Release/Profile 3곳)
+- 앱 정보 화면 코드 내 버전 문자열 `1.0.0` → `1.0.2` (버전 정보 행 + 오픈소스 라이선스 페이지)
+
+#### 앱 정보 이미지 버전 오버레이
+- `app_info1.png`에 박힌 "버전 1.0.0" 텍스트를 코드로 덮어씌우는 오버레이 적용
+- `LayoutBuilder` + `Positioned` 구조로 이미지 렌더링 높이 계산 후 정확한 위치에 배치
+  - 이미지 원본 853×642 비율 기준: `bottom = imgH * 0.10` (아래에서 10% = 위에서 약 88% 지점)
+  - 뱃지 스타일: 크림 배경 `#F5EDE2`, 테두리 `#CEB898`, 텍스트 `#8B6040` (원본 이미지와 동일 톤)
+
+#### 세로 모드 전용 고정
+- `ios/Runner/Info.plist`: iPhone `UISupportedInterfaceOrientations`에서 Landscape 제거 (Portrait만 유지)
+- `ios/Runner/Info.plist`: `UIRequiresFullScreen = true` 추가
+  - Apple 정책상 iPad 앱은 4방향 지원 의무 → `UIRequiresFullScreen`으로 멀티태스킹 면제
+- `lib/main.dart`: `SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp])` 추가
+
+#### App Store 업로드 가이드
+- `doc/appstore_upload_guide.md` 신규 작성
+  - 버전 번호 규칙, `flutter build ipa` 명령어, Xcode Organizer 업로드 절차
+  - App Store Connect 심사 제출 흐름, 업로드 전 체크리스트
+
+---
+
+### 일정 패널 UX 개선 (이전 세션 연속)
+
+#### 달력 레이아웃 조정
+- `_CalendarLayout`: `topPadding` 축소 (compact 30→20, expanded 44→32) — 달력 상단 여백 감소
+- `_CalendarLayout`: `infoPanelHeight` 확대 (compact 146→178, expanded 152→186) — 일정 패널 높이 증가
+
+#### 이모지 일정의 달력 셀 서브텍스트
+- 이모지가 등록된 일정이 있는 날짜 셀: 음력 날짜 위치에 일정 제목 표시
+- `_cellEmojis` 맵 값 타입을 `({String emoji, String dateLabel, String title})` 3필드 named record로 변경
+- `_CalendarDayCell`에 `displaySubText`/`displaySubColor` 분기 추가:
+  - `cellEmoji != null` → 제목 표시, 일반 서브텍스트 색상(`#656B75`)
+  - 그 외 → 기존 음력·특일 서브텍스트 유지
+- `maxLines: 1`, `TextOverflow.ellipsis`로 넘치는 텍스트 처리 (수동 자름 로직 없음)
+
+#### 일정 수정 후 순서 유지
+- `ScheduleFormSheet._save()`: 수정 시 `displayOrder: widget.initialSchedule?.displayOrder` 보존
+- 기존 문제: 수정 저장 시 `displayOrder`가 `null`로 초기화 → `COALESCE(display_order, 999999)` 정렬에서 맨 뒤로 밀림
+
+#### 꾹 눌러서 순서 변경 (drag-to-reorder) 복구
+- `ReorderableListView.builder`에 `physics: const NeverScrollableScrollPhysics()` 추가
+- 원인: 내부 `ScrollView` 제스처 인식기가 `ReorderableDelayedDragStartListener` 롱프레스와 충돌
+- `onReorder` (deprecated) → `onReorderItem` 교체 (newIndex 자동 보정, 별도 보정 로직 불필요)
+
+---
+
 ## V.0.30.101 — 2026-05-15
 
 ### 앱 아이콘 교체

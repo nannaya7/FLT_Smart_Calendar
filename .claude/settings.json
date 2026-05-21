@@ -5,7 +5,8 @@
       "Read(//c/Program Files/Android/**)",
       "Bash(ls \"C:/Users/HUNI/AppData/Local/Programs/\" 2>&1 | head -20; ls \"/c/Program Files/\" 2>&1 | grep -i android)",
       "Read(//c/Users/HUNI/AppData/Local/Programs/**)",
-      "Read(//c/Users/HUNI/AppData/Local/Pub/Cache/hosted/pub.dev/korean_lunar_utils-1.0.1/lib/**)"
+      "Read(//c/Users/HUNI/AppData/Local/Pub/Cache/hosted/pub.dev/korean_lunar_utils-1.0.1/lib/**)",
+      "Bash(sips -g pixelWidth -g pixelHeight /Users/huni/Repo/Flutter/FLT_Smart_Calendar/smart_calendar/image/splash/app_info1.png)"
     ]
   }
 }

@@ -38,6 +38,7 @@ class _CalendarPageState extends State<CalendarPage> {
   String? _customBackgroundPath;
 
   Map<String, int> _scheduleCounts = {};
+  Map<String, ({String emoji, String dateLabel, String title})> _cellEmojis = {};
   List<Schedule> _selectedDaySchedules = [];
 
   /// 정보 패널용 특일 맵 (기념일 포함)
@@ -237,16 +238,44 @@ class _CalendarPageState extends State<CalendarPage> {
     if (!mounted) return;
 
     final counts = <String, int>{};
+    final emojis = <String, ({String emoji, String dateLabel, String title})>{};
     for (final s in list) {
       if (s.repeatType != null) continue;
       counts[s.solarDate] = (counts[s.solarDate] ?? 0) + 1;
+      if (s.emoji != null && !emojis.containsKey(s.solarDate)) {
+        emojis[s.solarDate] = (
+          emoji: s.emoji!,
+          dateLabel: _emojiDateLabel(s, s.solarDate),
+          title: s.title,
+        );
+      }
     }
     for (final s in repeats) {
       for (final key in RepeatScheduleHelper.datesInMonth(s, month, _engine)) {
         counts[key] = (counts[key] ?? 0) + 1;
+        if (s.emoji != null && !emojis.containsKey(key)) {
+          emojis[key] = (
+            emoji: s.emoji!,
+            dateLabel: _emojiDateLabel(s, key),
+            title: s.title,
+          );
+        }
       }
     }
-    setState(() => _scheduleCounts = counts);
+    setState(() {
+      _scheduleCounts = counts;
+      _cellEmojis = emojis;
+    });
+  }
+
+  String _emojiDateLabel(Schedule s, String key) {
+    if (s.isLunar) {
+      final date = DateTime.parse(key);
+      final lunar = _engine.solarToLunar(date);
+      return '-${lunar.month}.${lunar.day}';
+    }
+    final parts = key.split('-');
+    return '+${int.parse(parts[1])}.${int.parse(parts[2])}';
   }
 
   Future<void> _loadSelectedDaySchedules(DateTime day) async {
@@ -455,6 +484,41 @@ class _CalendarPageState extends State<CalendarPage> {
     if (mounted && _selectedDay != null) {
       await _loadSelectedDaySchedules(_selectedDay!);
       _loadSchedules(_focusedDay);
+    }
+  }
+
+  Future<void> _reorderSchedules(int oldIndex, int newIndex) async {
+    final list = [..._selectedDaySchedules];
+    list.insert(newIndex, list.removeAt(oldIndex));
+
+    // 달력 셀 이모지: 이모지가 있는 일정 중 표시 순서가 가장 앞인 것
+    var updatedEmojis = _cellEmojis;
+    if (_selectedDay != null) {
+      final dayKey = _dateKey(_selectedDay!);
+      final firstWithEmoji = list.where((s) => s.emoji != null).firstOrNull;
+      updatedEmojis = Map.from(_cellEmojis);
+      if (firstWithEmoji == null) {
+        updatedEmojis.remove(dayKey);
+      } else {
+        updatedEmojis[dayKey] = (
+          emoji: firstWithEmoji.emoji!,
+          dateLabel: _emojiDateLabel(firstWithEmoji, dayKey),
+          title: firstWithEmoji.title,
+        );
+      }
+    }
+
+    setState(() {
+      _selectedDaySchedules = list;
+      _cellEmojis = updatedEmojis;
+    });
+
+    final ids = list
+        .where((s) => s.repeatType == null && s.id != null)
+        .map((s) => s.id!)
+        .toList();
+    if (ids.isNotEmpty) {
+      await DatabaseHelper.instance.updateScheduleDisplayOrders(ids);
     }
   }
 
@@ -766,6 +830,7 @@ class _CalendarPageState extends State<CalendarPage> {
       scheduleCount: _scheduleCounts[_dateKey(day)] ?? 0,
       apiEntry: _calendarHolidays[_dateKey(day)],
       cellInfo: _engine.cellInfo(day),
+      cellEmoji: _cellEmojis[_dateKey(day)],
     );
   }
 
@@ -915,17 +980,38 @@ class _CalendarPageState extends State<CalendarPage> {
                     ),
                   ),
                 )
-              : ListView.separated(
+              : ReorderableListView.builder(
                   padding: EdgeInsets.zero,
+                  buildDefaultDragHandles: false,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onReorderItem: _reorderSchedules,
+                  proxyDecorator: (child, _, animation) => Material(
+                    elevation: 6,
+                    color: Colors.transparent,
+                    shadowColor: Colors.black26,
+                    child: child,
+                  ),
                   itemCount: _selectedDaySchedules.length,
-                  separatorBuilder: (_, _) =>
-                      const Divider(height: 1, color: Color(0xFFEAECEF)),
                   itemBuilder: (_, i) {
                     final s = _selectedDaySchedules[i];
-                    return _ScheduleListItem(
-                      schedule: s,
-                      onEdit: () => _openEditForm(s),
-                      onDelete: () => _deleteSchedule(s),
+                    return ReorderableDelayedDragStartListener(
+                      key: ValueKey('sch_${s.id}_$i'),
+                      index: i,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _ScheduleListItem(
+                            schedule: s,
+                            onEdit: () => _openEditForm(s),
+                            onDelete: () => _deleteSchedule(s),
+                          ),
+                          if (i < _selectedDaySchedules.length - 1)
+                            const Divider(
+                              height: 1,
+                              color: Color(0xFFEAECEF),
+                            ),
+                        ],
+                      ),
                     );
                   },
                 ),
@@ -1302,7 +1388,7 @@ class _CalendarLayout {
       // 화면 좌우 기본 여백
       horizontalPadding: horizontalPadding,
       // 상단 SafeArea 아래에서 헤더가 시작되는 위치
-      topPadding: compact ? 30 : 44,
+      topPadding: compact ? 20 : 32,
       // 월별 배경 이미지 영역 높이
       heroHeight: compact ? 292 : (expanded ? 350 : 330),
       // 헤더와 달력 카드 사이 간격
@@ -1340,7 +1426,7 @@ class _CalendarLayout {
       // 날짜 선택/오늘 표시 배경 박스 모서리 둥글기
       dayCellRadius: lerp(10, 12),
       // 하단 일정 정보 패널 높이
-      infoPanelHeight: compact ? 146 : 152,
+      infoPanelHeight: compact ? 178 : 186,
       // 일정 정보 패널 내부 좌우 여백
       panelHorizontalPadding: compact ? 14 : 18,
       // 일정 정보 패널의 선택 날짜 글자 크기
@@ -1415,6 +1501,7 @@ class _CalendarDayCell extends StatelessWidget {
   final int scheduleCount;
   final Holiday? apiEntry;
   final ({String lunarLabel, String? holiday, bool isSpecial}) cellInfo;
+  final ({String emoji, String dateLabel, String title})? cellEmoji;
 
   const _CalendarDayCell({
     required this.day,
@@ -1425,6 +1512,7 @@ class _CalendarDayCell extends StatelessWidget {
     this.isSelected = false,
     this.isToday = false,
     this.isOutside = false,
+    this.cellEmoji,
   });
 
   @override
@@ -1454,6 +1542,16 @@ class _CalendarDayCell extends StatelessWidget {
           : const Color(0xFF656B75);
     }
 
+    final String displaySubText;
+    final Color displaySubColor;
+    if (cellEmoji != null) {
+      displaySubText = cellEmoji!.title;
+      displaySubColor = const Color(0xFF656B75);
+    } else {
+      displaySubText = subText;
+      displaySubColor = subColor;
+    }
+
     return Opacity(
       opacity: isOutside ? 0.28 : 1.0,
       child: Center(
@@ -1474,18 +1572,56 @@ class _CalendarDayCell extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                '${day.day}',
-                style: TextStyle(
-                  fontFamily: 'SpaceGrotesk',
-                  color: dayColor,
-                  fontSize: layout.dayNumberFont,
-                  fontWeight: FontWeight.w500,
+              if (cellEmoji != null)
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Text(
+                      cellEmoji!.emoji,
+                      style: TextStyle(
+                        fontSize: layout.dayNumberFont * 1.45,
+                        height: 1.0,
+                      ),
+                    ),
+                    if (scheduleCount >= 2)
+                      Positioned(
+                        top: -3,
+                        right: -9,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 3.3,
+                            vertical: 1.1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3678CF),
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: Text(
+                            '$scheduleCount',
+                            style: const TextStyle(
+                              fontFamily: 'SpaceGrotesk',
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                )
+              else
+                Text(
+                  '${day.day}',
+                  style: TextStyle(
+                    fontFamily: 'SpaceGrotesk',
+                    color: dayColor,
+                    fontSize: layout.dayNumberFont,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
               SizedBox(
                 height: layout.dayDotAreaHeight,
-                child: scheduleCount > 0
+                child: (cellEmoji == null && scheduleCount > 0)
                     ? Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         mainAxisSize: MainAxisSize.min,
@@ -1505,11 +1641,11 @@ class _CalendarDayCell extends StatelessWidget {
                     : null,
               ),
               Text(
-                subText,
+                displaySubText,
                 style: TextStyle(
                   fontFamily: 'Inter',
                   fontFamilyFallback: const ['Pretendard'],
-                  color: subColor,
+                  color: displaySubColor,
                   fontSize: layout.daySubFont,
                   fontWeight: FontWeight.w500,
                 ),
@@ -1583,23 +1719,65 @@ class _AppInfoPage extends StatelessWidget {
         body: SingleChildScrollView(
           child: Column(
             children: [
-              Image.asset(
-                'image/splash/app_info1.png',
-                width: double.infinity,
-                fit: BoxFit.fitWidth,
-                errorBuilder: (_, _, _) => Container(
-                  height: 220,
-                  color: const Color(0xFFEEE0D0),
-                  child: const Center(
-                    child: Text(
-                      '이미지 준비 중',
-                      style: TextStyle(
-                        fontFamily: 'Pretendard',
-                        color: Color(0xFFB09070),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  // 이미지 원본 853×642 비율 기준 렌더링 높이 계산
+                  final imgH = constraints.maxWidth * (642 / 853);
+                  return Stack(
+                    children: [
+                      Image.asset(
+                        'image/splash/app_info1.png',
+                        width: double.infinity,
+                        fit: BoxFit.fitWidth,
+                        errorBuilder: (_, _, _) => Container(
+                          height: 220,
+                          color: const Color(0xFFEEE0D0),
+                          child: const Center(
+                            child: Text(
+                              '이미지 준비 중',
+                              style: TextStyle(
+                                fontFamily: 'Pretendard',
+                                color: Color(0xFFB09070),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ),
+                      // 이미지에 박힌 "버전 1.0.0" 위에 덮어씌우는 뱃지
+                      // bottom 값: 이미지 하단에서 10% 지점 (원본 y≈88% 위치)
+                      Positioned(
+                        bottom: imgH * 0.08,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 15,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF5EDE2),
+                              borderRadius: BorderRadius.circular(15),
+                              border: Border.all(
+                                color: const Color(0xFFCEB898),
+                                width: 1.2,
+                              ),
+                            ),
+                            child: const Text(
+                              '버전 1.0.2',
+                              style: TextStyle(
+                                fontFamily: 'Pretendard',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF8B6040),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -1616,7 +1794,7 @@ class _AppInfoPage extends StatelessWidget {
                           _AppInfoRow(
                             icon: Icons.info_outline,
                             label: '버전 정보',
-                            value: '1.0.0',
+                            value: '1.0.2',
                           ),
                           Divider(
                             height: 1,
@@ -1669,7 +1847,7 @@ class _AppInfoPage extends StatelessWidget {
                             onTap: () => showLicensePage(
                               context: context,
                               applicationName: '까사음력달력',
-                              applicationVersion: '1.0.0',
+                              applicationVersion: '1.0.2',
                               applicationLegalese:
                                   '© 2026 LEES CASAWARE LAB',
                             ),
@@ -1836,22 +2014,30 @@ class _ScheduleListItem extends StatelessWidget {
     return Slidable(
       key: Key('sp_${s.id}'),
       endActionPane: ActionPane(
-        motion: const DrawerMotion(),
-        extentRatio: 0.4,
+        motion: const BehindMotion(),
+        extentRatio: 0.38,
         children: [
           SlidableAction(
             onPressed: (_) => onEdit(),
-            backgroundColor: const Color(0xFF5B8DEF),
+            backgroundColor: const Color(0xFF8CB4E8),
             foregroundColor: Colors.white,
             icon: Icons.edit_outlined,
+            spacing: 2,
             label: '수정',
+            padding: EdgeInsets.zero,
           ),
           SlidableAction(
             onPressed: (_) => onDelete(),
-            backgroundColor: const Color(0xFFFF6B6B),
+            backgroundColor: const Color(0xFFE88282),
             foregroundColor: Colors.white,
             icon: Icons.delete_outline,
+            spacing: 2,
             label: '삭제',
+            padding: EdgeInsets.zero,
+            borderRadius: const BorderRadius.only(
+              topRight: Radius.circular(14),
+              bottomRight: Radius.circular(14),
+            ),
           ),
         ],
       ),

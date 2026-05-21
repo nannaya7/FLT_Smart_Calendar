@@ -1,6 +1,6 @@
 # 스마트 하이브리드 달력 현행 설계서
 
-작성일: 2026-05-14
+작성일: 2026-05-14 / 최종 수정: 2026-05-21
 
 ## 1. 프로젝트 개요
 
@@ -258,6 +258,7 @@ smart_calendar/lib/
 |---|---|---|
 | id | int? | DB PK |
 | title | String | 일정 제목 |
+| emoji | String? | 이모지 문자 (달력 셀 서브텍스트에 제목 표시 트리거) |
 | memo | String? | 메모 |
 | solarDate | String | 양력 기준 저장일 (YYYY-MM-DD) |
 | time | String? | 시작 시간 (HH:mm) |
@@ -269,6 +270,7 @@ smart_calendar/lib/
 | repeatType | String? | null / daily / monthly / yearly |
 | lunarMonth | int? | 음력 월 (isLunar=true 일 때) |
 | lunarDay | int? | 음력 일 (isLunar=true 일 때) |
+| displayOrder | int? | 날짜 내 정렬 순서 (null이면 COALESCE로 999999 취급 → 맨 뒤) |
 
 ### 8.2 Holiday
 
@@ -283,12 +285,13 @@ smart_calendar/lib/
 - `isAnniversary`: type == 'anniversary'
 - `insertPriority(map, h)`: 같은 날짜에 우선순위 높은 것만 map에 유지 (rest_day 50 > solar_term 40 > national_holiday 35 > anniversary 20)
 
-## 9. DB 스키마 (v5)
+## 9. DB 스키마 (v7)
 
 ```sql
 CREATE TABLE schedules (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     title                 TEXT    NOT NULL,
+    emoji                 TEXT,
     memo                  TEXT,
     solar_date            TEXT    NOT NULL,
     time                  TEXT,
@@ -299,7 +302,8 @@ CREATE TABLE schedules (
     category_color        INTEGER NOT NULL DEFAULT 4280391411,
     repeat_type           TEXT,
     lunar_month           INTEGER,
-    lunar_day             INTEGER
+    lunar_day             INTEGER,
+    display_order         INTEGER
 );
 
 CREATE TABLE holidays (
@@ -315,6 +319,8 @@ CREATE TABLE holidays (
 - v2 → v3: repeat_type 추가
 - v3 → v4: lunar_month, lunar_day 추가
 - v4 → v5: end_time, location 추가
+- v5 → v6: emoji 추가
+- v6 → v7: display_order 추가
 
 ## 10. 공휴일/절기 연동
 

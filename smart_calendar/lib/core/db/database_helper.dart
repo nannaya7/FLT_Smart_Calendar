@@ -5,7 +5,7 @@ import '../../shared/models/holiday.dart';
 
 class DatabaseHelper {
   static const _dbName = 'smart_calendar.db';
-  static const _dbVersion = 5;
+  static const _dbVersion = 7;
   static const tableSchedules = 'schedules';
   static const tableHolidays = 'holidays';
 
@@ -35,6 +35,7 @@ class DatabaseHelper {
       CREATE TABLE $tableSchedules (
         id                   INTEGER PRIMARY KEY AUTOINCREMENT,
         title                TEXT    NOT NULL,
+        emoji                TEXT,
         memo                 TEXT,
         solar_date           TEXT    NOT NULL,
         time                 TEXT,
@@ -45,7 +46,8 @@ class DatabaseHelper {
         category_color       INTEGER NOT NULL DEFAULT ${0xFF2196F3},
         repeat_type          TEXT,
         lunar_month          INTEGER,
-        lunar_day            INTEGER
+        lunar_day            INTEGER,
+        display_order        INTEGER
       )
     ''');
     await _createHolidaysTable(db);
@@ -69,6 +71,14 @@ class DatabaseHelper {
     if (oldVersion < 5) {
       await db.execute('ALTER TABLE $tableSchedules ADD COLUMN end_time TEXT');
       await db.execute('ALTER TABLE $tableSchedules ADD COLUMN location TEXT');
+    }
+    if (oldVersion < 6) {
+      await db.execute('ALTER TABLE $tableSchedules ADD COLUMN emoji TEXT');
+    }
+    if (oldVersion < 7) {
+      await db.execute(
+        'ALTER TABLE $tableSchedules ADD COLUMN display_order INTEGER',
+      );
     }
   }
 
@@ -108,9 +118,24 @@ class DatabaseHelper {
       tableSchedules,
       where: 'solar_date = ?',
       whereArgs: [solarDate],
-      orderBy: 'time ASC',
+      orderBy: 'COALESCE(display_order, 999999), time ASC',
     );
     return rows.map(Schedule.fromMap).toList();
+  }
+
+  /// 일정 표시 순서 일괄 업데이트
+  Future<void> updateScheduleDisplayOrders(List<int> orderedIds) async {
+    final db = await database;
+    final batch = db.batch();
+    for (int i = 0; i < orderedIds.length; i++) {
+      batch.update(
+        tableSchedules,
+        {'display_order': i},
+        where: 'id = ?',
+        whereArgs: [orderedIds[i]],
+      );
+    }
+    await batch.commit(noResult: true);
   }
 
   /// 특정 월(YYYY-MM)의 일정 목록 반환 — 달력 마커 표시용
@@ -120,7 +145,7 @@ class DatabaseHelper {
       tableSchedules,
       where: "solar_date LIKE ?",
       whereArgs: ['$yearMonth-%'],
-      orderBy: 'solar_date ASC, time ASC',
+      orderBy: 'solar_date ASC, COALESCE(display_order, 999999), time ASC',
     );
     return rows.map(Schedule.fromMap).toList();
   }

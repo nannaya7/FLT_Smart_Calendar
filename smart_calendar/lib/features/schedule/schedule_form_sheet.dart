@@ -1,3 +1,4 @@
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/calendar_engine.dart';
@@ -50,6 +51,7 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
   final _titleCtrl = TextEditingController();
   final _memoCtrl = TextEditingController();
 
+  String? _selectedEmoji;
   TimeOfDay? _startTime;
   _Alarm _alarm = _Alarm.fifteen;
   _Repeat _repeat = _Repeat.none;
@@ -85,6 +87,7 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
     final s = widget.initialSchedule;
     if (s != null) {
       _titleCtrl.text = s.title;
+      _selectedEmoji = s.emoji;
       _memoCtrl.text = s.memo ?? '';
       _isLunar = s.isLunar;
       _selectedColor = s.categoryColor;
@@ -220,6 +223,7 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
       final schedule = Schedule(
         id: widget.initialSchedule?.id,
         title: title,
+        emoji: _selectedEmoji,
         memo: _memoCtrl.text.trim().isEmpty ? null : _memoCtrl.text.trim(),
         location: null,
         solarDate: _fmtDate(widget.date),
@@ -231,6 +235,7 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
         repeatType: _repeat.value,
         lunarMonth: _isLunar ? _lunarMonth : null,
         lunarDay: _isLunar ? _lunarDay : null,
+        displayOrder: widget.initialSchedule?.displayOrder,
       );
 
       int id;
@@ -352,9 +357,17 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
                     const SizedBox(height: 22),
                     _formField(
                       label: '제목',
-                      child: _plainInput(
-                        controller: _titleCtrl,
-                        hint: '일정 제목을 입력하세요',
+                      child: Row(
+                        children: [
+                          _emojiButton(),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _plainInput(
+                              controller: _titleCtrl,
+                              hint: '일정 제목을 입력하세요',
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -936,6 +949,104 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
     );
   }
 
+  Widget _emojiButton() {
+    return GestureDetector(
+      onTap: _showEmojiPicker,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F5F7),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _fieldBorder),
+        ),
+        alignment: Alignment.center,
+        child: _selectedEmoji != null
+            ? Text(_selectedEmoji!, style: const TextStyle(fontSize: 22))
+            : const Icon(
+                Icons.add_reaction_outlined,
+                size: 22,
+                color: Color(0xFFBBBBBB),
+              ),
+      ),
+    );
+  }
+
+  Future<void> _showEmojiPicker() async {
+    String? result;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      isScrollControlled: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 8, 4),
+                child: Row(
+                  children: [
+                    const Text(
+                      '이모지 선택',
+                      style: TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF202124),
+                      ),
+                    ),
+                    const Spacer(),
+                    if (_selectedEmoji != null)
+                      TextButton(
+                        onPressed: () {
+                          result = '';
+                          Navigator.of(ctx).pop();
+                        },
+                        child: const Text(
+                          '삭제',
+                          style: TextStyle(
+                            fontFamily: 'Pretendard',
+                            color: Color(0xFFE05555),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              EmojiPicker(
+                onEmojiSelected: (_, emoji) {
+                  result = emoji.emoji;
+                  Navigator.of(ctx).pop();
+                },
+                config: const Config(
+                  height: 280,
+                  emojiViewConfig: EmojiViewConfig(
+                    backgroundColor: Colors.white,
+                  ),
+                  categoryViewConfig: CategoryViewConfig(
+                    backgroundColor: Colors.white,
+                    indicatorColor: Color(0xFF8CB4E8),
+                    iconColor: Color(0xFFBBBBBB),
+                    iconColorSelected: Color(0xFF8CB4E8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted || result == null) return;
+    setState(() => _selectedEmoji = result!.isEmpty ? null : result);
+  }
+
   Widget _bottomButton({
     required String label,
     required VoidCallback? onTap,
@@ -978,3 +1089,4 @@ class _ScheduleFormSheetState extends State<ScheduleFormSheet> {
     );
   }
 }
+

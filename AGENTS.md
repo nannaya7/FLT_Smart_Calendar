@@ -72,3 +72,11 @@ lib/
 - 메인 달력 UI는 월별 이미지 히어로 + 흰색 카드형 달력 + 일정 카드 구조를 유지한다
 - 날짜 셀의 양력/음력 폰트와 간격은 작은 iPhone과 Pro Max에서 모두 확인한다
 - 월 전환 애니메이션은 이전/다음 방향에 맞춘 좌우 슬라이드 방식을 사용한다
+- 스와이프 액션바 **일정** 버튼: `_MonthlyScheduleSheet` 팝업으로 해당 달 전체 일정·특일 목록 표시 (일정 추가 폼 아님)
+- 스와이프 액션바 **정보** 버튼: `splash/app_info.png` 전체 화면 오버레이 (`showGeneralDialog` + FadeTransition, 탭으로 닫기)
+- 일정 추가/수정 폼 헤더: "일정 추가" 제목 옆에 `yyyy. M. d  (음M.d)` 형식으로 날짜 표시 — 녹색(`0xFF80E080`), bold, 16px
+- 반복·알림 셀렉터: `AnimatedSize` + `AnimatedRotation` 인라인 확장 리스트 패턴 사용
+- `TableCalendar`의 `availableGestures: AvailableGestures.horizontalSwipe` — 달력 셀 위 상하 스와이프 제스처 충돌 방지
+- 이모지가 등록된 일정: 달력 셀 서브텍스트 위치에 음력 날짜 대신 일정 제목 표시 (`TextOverflow.ellipsis`)
+- 일정 목록 순서: `display_order` 컬럼으로 관리 (`COALESCE(display_order, 999999)` 정렬), 꾹 눌러 변경
+- iOS는 세로 모드 전용 (`UIRequiresFullScreen = true`, `SystemChrome.setPreferredOrientations`)

@@ -1,6 +1,7 @@
 class Schedule {
   final int? id;
   final String title;
+  final String? emoji;
   final String? memo;
   final String solarDate; // YYYY-MM-DD
   final String? time; // HH:mm
@@ -12,10 +13,12 @@ class Schedule {
   final String? repeatType; // null | 'daily' | 'monthly' | 'yearly'
   final int? lunarMonth;
   final int? lunarDay;
+  final int? displayOrder;
 
   const Schedule({
     this.id,
     required this.title,
+    this.emoji,
     this.memo,
     required this.solarDate,
     this.time,
@@ -27,11 +30,13 @@ class Schedule {
     this.repeatType,
     this.lunarMonth,
     this.lunarDay,
+    this.displayOrder,
   });
 
   Schedule copyWith({
     int? id,
     String? title,
+    Object? emoji = _sentinel,
     String? memo,
     String? solarDate,
     String? time,
@@ -43,10 +48,12 @@ class Schedule {
     Object? repeatType = _sentinel,
     Object? lunarMonth = _sentinel,
     Object? lunarDay = _sentinel,
+    Object? displayOrder = _sentinel,
   }) {
     return Schedule(
       id: id ?? this.id,
       title: title ?? this.title,
+      emoji: emoji == _sentinel ? this.emoji : emoji as String?,
       memo: memo ?? this.memo,
       solarDate: solarDate ?? this.solarDate,
       time: time ?? this.time,
@@ -62,12 +69,16 @@ class Schedule {
           ? this.lunarMonth
           : lunarMonth as int?,
       lunarDay: lunarDay == _sentinel ? this.lunarDay : lunarDay as int?,
+      displayOrder: displayOrder == _sentinel
+          ? this.displayOrder
+          : displayOrder as int?,
     );
   }
 
   Map<String, dynamic> toMap() => {
     if (id != null) 'id': id,
     'title': title,
+    'emoji': emoji,
     'memo': memo,
     'solar_date': solarDate,
     'time': time,
@@ -79,11 +90,13 @@ class Schedule {
     'repeat_type': repeatType,
     'lunar_month': lunarMonth,
     'lunar_day': lunarDay,
+    'display_order': displayOrder,
   };
 
   factory Schedule.fromMap(Map<String, dynamic> map) => Schedule(
     id: map['id'] as int?,
     title: map['title'] as String,
+    emoji: map['emoji'] as String?,
     memo: map['memo'] as String?,
     solarDate: map['solar_date'] as String,
     time: map['time'] as String?,
@@ -95,6 +108,7 @@ class Schedule {
     repeatType: map['repeat_type'] as String?,
     lunarMonth: map['lunar_month'] as int?,
     lunarDay: map['lunar_day'] as int?,
+    displayOrder: map['display_order'] as int?,
   );
 
   static const _sentinel = Object();

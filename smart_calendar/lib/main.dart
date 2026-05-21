@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'core/notifications/notification_service.dart';
 import 'features/calendar/calendar_page.dart';
 
 void main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   binding.deferFirstFrame();
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   final splashDelay = Future<void>.delayed(const Duration(seconds: 1));
   await NotificationService.instance.init();
